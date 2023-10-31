@@ -113,7 +113,7 @@
   "functions": [],
   "variables": {
     "VMPrefix":"[concat(parameters('virtualMachineNamePrefix'),'-')]",
-    "PIPPrefix":"[concat(parameters('dnsPrefixForPublicIP'),parameters('location'),'-')]",
+    "PIPPrefix":"[concat(parameters('dnsPrefixForPublicIP'),'-')]",
     "NSGName":"[concat(parameters('networkSecurityGroupName'),'-',parameters('location'))]",
     "VNETName":"[concat(parameters('virtualNetworkName'),'-',parameters('location'))]",
     "diagnosticStorageAccountName": "[concat(format('diagst{0}','fcet'),parameters('location'))]",

@@ -54,8 +54,48 @@ Param
 
     # 
 	[Parameter(Mandatory=$false,HelpMessage="")]
-    [String]$ASDKVersion = '2301'
+    [String]$ASDKVersion = '2301',
+
+    [Parameter(Mandatory=$false,HelpMessage="")]
+    [String]$VirtualMachineNamePrefix = 'VA',
+
+    [Parameter(Mandatory=$false,HelpMessage="")]
+    [Int]$VirtualMachineCount = '1',
+
+    [Parameter(Mandatory=$false,HelpMessage="")]
+    [String]$VirtualMachineSize = 'Standard_E16s_v3',
+
+    [Parameter(Mandatory=$false,HelpMessage="")]
+    [String]$DNSPrefixForPublicIP = 'VA-HUB',
+
+    [Parameter(Mandatory=$false,HelpMessage="")]
+    [String]$VirtualNetworkName = 'AzSHub-VNet',
+
+    [Parameter(Mandatory=$false,HelpMessage="")]
+    [String]$VirtualNetworkPrefix = '10.0.0.0/16',
+
+    [Parameter(Mandatory=$false,HelpMessage="")]
+    [String]$SubnetName = "Subnet1",
+
+    [Parameter(Mandatory=$false,HelpMessage="")]
+    [String]$SubnetPrefix = "10.0.0.0/24",
+
+    [Parameter(Mandatory=$false,HelpMessage="")]
+    [String]$NetworkSecurityGroupName = "AzS-Hub-NSG",
+
+    [Parameter(Mandatory=$false,HelpMessage="")]
+    [String]$DiagnosticStorageAccountSku = "Standard_LRS",
+
+    [Parameter(Mandatory=$false,HelpMessage="")]
+    [String]$DiagnosticStorageAccountKind = "StorageV2",
+
+    [Parameter(Mandatory=$false,HelpMessage="")]
+    [String]$SourceAddressForRDP
+
 )
+
+$SourceAddressForRDP = ((Invoke-WebRequest -uri “https://api.ipify.org/”).Content + '/32')
+$VirtualMachineAdminPassword = ConvertTo-SecureString -String '!A@S3d4f5g6h7j8k' -AsPlainText -Force
 
 #region Connect to Azure
 
@@ -90,8 +130,6 @@ catch
 $Locations = Get-AzLocation
 $Location = $Locations | Out-GridView -Title "Please Select the Azure Resource Deployment Region." -PassThru
 #endregion
-
-$VirtualMachineAdminPassword = ConvertTo-SecureString -String '!A@S3d4f5g6h7j8k' -AsPlainText -Force
 
 # region ASDK URLs
 if ($ASDKVersion -eq '2301')
@@ -131,9 +169,28 @@ else
     $LabResourceGroup = Get-AzResourceGroup -Name $LabResourceGroupName -Location $Location.Location
 }
 
+$TemplateParams = @{
+    virtualMachineAdminUserName = $VirtualMachineAdminUserName
+    virtualMachineAdminPassword = $VirtualMachineAdminPassword
+    virtualMachineNamePrefix = $VirtualMachineNamePrefix
+    virtualMachineCount = $VirtualMachineCount
+    virtualMachineSize = $VirtualMachineSize
+    location = $Location.Location
+    virtualNetworkName = $VirtualNetworkName
+    virtualNetworkPrefix = $VirtualNetworkPrefix
+    dnsPrefixForPublicIP = $DNSPrefixForPublicIP
+    SubnetName = $SubnetName
+    subnetPrefix = $SubnetPrefix
+    networkSecurityGroupName = $NetworkSecurityGroupName
+    diagnosticStorageAccountSku = $DiagnosticStorageAccountSku
+    diagnosticStorageAccountKind = $DiagnosticStorageAccountKind
+    sourceAddressForRDP = $SourceAddressForRDP
+}
+
 New-AzResourceGroupDeployment -Name ASDKDeployment `
     -ResourceGroupName $LabResourceGroup.ResourceGroupName `
-    -TemplateParameterFile C:\Git\Deploy-ASDK-ADFS\azuredeploy.json `
+    -TemplateUri 'https://github.com/RichShillingtonMSFT/Deploy-ASDK-ADFS/blob/81c57b83736a7cad1c5ebeb8730248fbb0dcd7ce/azuredeploy.json' `
+    -TemplateParameterObject $TemplateParams -Mode Incremental
     
 
 
