@@ -101,7 +101,14 @@
     "dataDiskSizeGB": {
       "type": "int",
       "defaultValue": 2048
+    },
+    "sourceAddressForRDP": {
+      "type": "string",
+      "metadata": {
+        "description": "Provide the Source IP Address for the NSG to allow 3389 to the ASDK"
+      }
     }
+    
   },
   "functions": [],
   "variables": {
@@ -143,27 +150,14 @@
       "properties": {
         "securityRules": [
           {
-            "name": "default-allow-3389",
+            "name": "allow-3389",
             "properties": {
               "priority": 1000,
               "access": "Allow",
               "direction": "Inbound",
               "destinationPortRange": "3389",
               "protocol": "Tcp",
-              "sourceAddressPrefix": "*",
-              "sourcePortRange": "*",
-              "destinationAddressPrefix": "*"
-            }
-          },
-          {
-            "name":"WinRM-HTTPS-5986",
-            "properties": {
-              "priority": 900,
-              "access": "Allow",
-              "direction": "Inbound",
-              "destinationPortRange": "5986",
-              "protocol": "Tcp",
-              "sourceAddressPrefix": "*",
+              "sourceAddressPrefix": "[parameters('sourceAddressForRDP')]",
               "sourcePortRange": "*",
               "destinationAddressPrefix": "*"
             }
