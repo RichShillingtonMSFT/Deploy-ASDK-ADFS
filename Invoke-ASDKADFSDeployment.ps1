@@ -90,7 +90,7 @@ $ASDKLinkUri = "https://asdkdeploymentsa.blob.core.usgovcloudapi.net/asdks/$ASDK
 
 if (!($SourceAddressForRDP))
 {
-    $SourceAddressForRDP = ((Invoke-WebRequest -uri “https://api.ipify.org/”).Content + '/32')
+    $SourceAddressForRDP = ((Invoke-WebRequest -uri ï¿½https://api.ipify.org/ï¿½).Content + '/32')
 }
 
 Function ConvertFrom-SecureStringToPlainText 
@@ -1140,7 +1140,6 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
     Write-Host "$($VirtualMachineName) - Starting ASDK Deployment." -ForegroundColor Green
     $AdminPassword = ConvertFrom-SecureStringToPlainText -SecurePassword $VirtualMachineAdminPassword -ErrorAction 'Stop'
-    $AADPassword = ConvertFrom-SecureStringToPlainText -SecurePassword $AzureADCredential.Password -ErrorAction 'Stop'
 
 $ScriptString = @"
 `$AADscriptToExecute = @'
