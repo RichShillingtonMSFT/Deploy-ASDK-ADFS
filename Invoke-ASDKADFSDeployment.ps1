@@ -10,8 +10,7 @@
         -DNSForwarder '8.8.8.8' -TimeServer '168.61.215.74' `
         -VirtualMachineAdminUserName 'VMAdmin' `
         -ASDKVersion '2108' -VirtualMachineNamePrefix 'HUB' `
-        -VirtualMachineCount '1' -DNSPrefixForPublicIP 'asdk-' `
-
+        -VirtualMachineCount '1' -DNSPrefixForPublicIP 'asdk-'
 #>
 [CmdletBinding()]
 Param
@@ -174,7 +173,7 @@ $TemplateParams = @{
 
 $Deployment = New-AzResourceGroupDeployment -Name ASDKDeployment `
     -ResourceGroupName $LabResourceGroup.ResourceGroupName `
-    -TemplateFile 'C:\Git\Deploy-ASDK-ADFS\azuredeploy.json' `
+    -TemplateUri 'https://raw.githubusercontent.com/RichShillingtonMSFT/Deploy-ASDK-ADFS/main/azuredeploy.json' `
     -TemplateParameterObject $TemplateParams -Mode Incremental -DeploymentDebugLogLevel All
 
 $DeployedVirtualMachines = $Deployment.Outputs.Values.value
