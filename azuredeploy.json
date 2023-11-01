@@ -116,7 +116,7 @@
     "PIPPrefix":"[concat(parameters('dnsPrefixForPublicIP'),'-')]",
     "NSGName":"[concat(parameters('networkSecurityGroupName'),'-',parameters('location'))]",
     "VNETName":"[concat(parameters('virtualNetworkName'),'-',parameters('location'))]",
-    "diagnosticStorageAccountName": "[concat(format('diagst{0}','fcet'),parameters('location'))]",
+    "diagnosticStorageAccountName": "[concat('diagst',uniqueString(resourceGroup().id))]",
     "operatingSystemValues": {
       "Server2016": {
         "PublisherValue": "MicrosoftWindowsServer",
@@ -264,6 +264,10 @@
             }
           ]
         },
+        "additionalCapabilities": {
+            "ultraSSDEnabled": true
+        },
+        "licenseType": "Windows_Server",
         "diagnosticsProfile": {
           "bootDiagnostics": {
             "enabled": true,
