@@ -336,7 +336,7 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
 
 #region Prepare Virtual Machine Boot VHD & Configure OOBe Setup
 Write-Host "Now it is time to prepare the Virtual Machine VHDs and Configure the VM to boot from a VHD." -ForegroundColor Yellow
-Write-Host "Depending on Disk Speed, this can take up to 2 Hours. Just relax...." -ForegroundColor Yellow
+Write-Host "Depending on Disk Speed, this can take a few minutes. Just relax...." -ForegroundColor Yellow
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
