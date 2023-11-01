@@ -154,7 +154,7 @@ If (!($LabResourceGroup))
 {
     $LabResourceGroup = New-AzResourceGroup -Name $LabResourceGroupName -Location $Location.Location
 }
-Write-Host "Resource Group @($LabResourceGroupName) is ready" -ForegroundColor Green
+Write-Host "Resource Group $LabResourceGroupName is ready" -ForegroundColor Green
 #endregion
 
 #region Template Deployment
