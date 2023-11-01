@@ -87,6 +87,7 @@ Param
 )
 
 $ASDKLinkUri = "https://asdkdeploymentsa.blob.core.usgovcloudapi.net/asdks/$ASDKVersion/CloudBuilder.vhdx"
+$AdminPassword = ConvertFrom-SecureStringToPlainText -SecurePassword $VirtualMachineAdminPassword -ErrorAction 'Stop'
 
 if (!($SourceAddressForRDP))
 {
@@ -174,15 +175,16 @@ $TemplateParams = @{
 $Deployment = New-AzResourceGroupDeployment -Name ASDKDeployment `
     -ResourceGroupName $LabResourceGroup.ResourceGroupName `
     -TemplateUri 'https://raw.githubusercontent.com/RichShillingtonMSFT/Deploy-ASDK-ADFS/main/azuredeploy.json' `
-    -TemplateParameterObject $TemplateParams -Mode Incremental -DeploymentDebugLogLevel All
+    -TemplateParameterObject $TemplateParams -Mode Incremental
 
 $DeployedVirtualMachines = $Deployment.Outputs.Values.value
 #endregion
 
-#region Configure Virtual Machine, Disks, Copy Setup Files from Azure Storage & Restart
+#region Configure Virtual Machine Disks
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
-    Write-host "$($VirtualMachineName) - Configuring VM Disks. Please wait..." -ForegroundColor Green
+    Write-host "$($VirtualMachineName) - Configuring VM Disks." -ForegroundColor Green
+    Write-host "$($VirtualMachineName) - This takes about 5 minutes. Please wait..." -ForegroundColor Green
 
 $ScriptString = @"
 `@'
@@ -206,8 +208,15 @@ Install-WindowsFeature -Name Hyper-V -IncludeManagementTools
         -ScriptString $ScriptString -AsJob
 
     Get-Job -Id $Job.Id | Wait-Job
+}
+#endregion
 
-    Write-host "$($VirtualMachineName) - Downloading Setup files from Azure Storage. This may take some time. Please wait..." -ForegroundColor Green
+#region Copy Setup Files from Azure Storage & Restart
+foreach ($VirtualMachineName in $DeployedVirtualMachines)
+{
+    Write-host "$($VirtualMachineName) - Downloading Setup files from Azure Storage." -ForegroundColor Green
+    Write-host "$($VirtualMachineName) - This takes about 5 minutes. Please wait..." -ForegroundColor Green
+
 $ScriptString = @"
 `$InstallFilesDirectory = New-Item -Path C:\ -Name SetupFiles -ItemType Directory -Force;
 Invoke-WebRequest -UseBasicParsing -Uri 'https://aka.ms/downloadazcopy-v10-windows' -OutFile "`$(`$InstallFilesDirectory.FullName)\azcopy.zip";
@@ -227,8 +236,15 @@ azcopy copy 'https://asdkdeploymentsa.blob.core.usgovcloudapi.net/software' `$(`
         -ScriptString $ScriptString -AsJob
 
     Get-Job -Id $Job.Id | Wait-Job
+}
+#endregion
 
-    Write-host "$($VirtualMachineName) - Restarting Virtual Machine. Please wait..." -ForegroundColor Green
+#region Copy Setup Files from Azure Storage & Restart
+foreach ($VirtualMachineName in $DeployedVirtualMachines)
+{
+    Write-host "$($VirtualMachineName) - Restarting Virtual Machine." -ForegroundColor Green
+    Write-host "$($VirtualMachineName) - This takes about 5 minutes. Please wait..." -ForegroundColor Green
+
     $Job = Restart-AzVM -ResourceGroupName $LabResourceGroup.ResourceGroupName -Name $VirtualMachineName -AsJob
     Get-Job -Id $Job.Id | Wait-Job
 }
@@ -237,8 +253,9 @@ azcopy copy 'https://asdkdeploymentsa.blob.core.usgovcloudapi.net/software' `$(`
 #region Prepare Virtual Machine Boot VHD & Configure OOBe Setup
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
-    Write-Host "$($VirtualMachineName) - Preparing Virtual Machine VHDs and Configuring it for VHD Boot. This will take a bit of time. Just relax...." -ForegroundColor Yellow
-
+    Write-Host "$($VirtualMachineName) - Preparing Virtual Machine VHDs and Configuring it for VHD Boot." -ForegroundColor Green
+    Write-Host "$($VirtualMachineName) - Depending on Disk Speed, this can take up to 2 Hours. Just relax...." -ForegroundColor Yellow
+    
     $AdminPassword = ConvertFrom-SecureStringToPlainText -SecurePassword $VirtualMachineAdminPassword
 
 $ScriptString = @"
@@ -383,13 +400,21 @@ bcdboot `$Prepare_Vhdx_DriveLetter':\Windows'
         -ScriptString $ScriptString -AsJob
 
     Get-Job -Id $Job.Id | Wait-Job
+}
+#endregion
 
+#region Restart Virtual Machines and wait for setup to complete
+foreach ($VirtualMachineName in $DeployedVirtualMachines)
+{
     Write-host "$($VirtualMachineName) - Restarting Virtual Machine. Please wait..." -ForegroundColor Green
+    Write-host "$($VirtualMachineName) - This takes about 5 minutes. Please wait..." -ForegroundColor Green
+
     $Job = Restart-AzVM -ResourceGroupName $LabResourceGroup.ResourceGroupName -Name $VirtualMachineName -AsJob
     Get-Job -Id $Job.Id | Wait-Job
 
     Write-host "$($VirtualMachineName) - Waiting a few minutes for the VM to complete setup..." -ForegroundColor Green
-    Start-Sleep -Seconds 600
+    Write-host "$($VirtualMachineName) - This takes about 10 minutes. Please wait..." -ForegroundColor Green
+    Start-Sleep -Seconds 500
 }
 #endregion
 
@@ -397,6 +422,7 @@ bcdboot `$Prepare_Vhdx_DriveLetter':\Windows'
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
     Write-Host "$($VirtualMachineName) - Resizing the OS Disk and Installing Software." -ForegroundColor Green
+    Write-host "$($VirtualMachineName) - This takes about 5-10 minutes. Please wait..." -ForegroundColor Green
 
 $ScriptString = @'
 $Partition = Get-Partition -DriveLetter C
@@ -408,9 +434,15 @@ $EdgeBrowser = Get-ChildItem -Path E:\SetupFiles\software -Filter *MicrosoftEdge
 Start-Process msiexec.exe -ArgumentList "/i $($EdgeBrowser.FullName) /quiet" -Wait
 
 #Install VSCode
-#$VSCodeSetup = Get-ChildItem -Path E:\SetupFiles\software -Filter *VSCodeSetup*.exe
-#$installerArguments = "/silent /mergetasks='!runcode,addcontextmenufiles,addcontextmenufolders,associatewithfiles,addtopath'"
-#Start-Process $($VSCodeSetup.FullName) -ArgumentList $installerArguments -Wait
+$VSCodeSetup = Get-ChildItem -Path E:\SetupFiles\software -Filter *VSCodeSetup*.exe
+$installerArguments = '/verysilent /tasks=addcontextmenufiles,addcontextmenufolders,addtopath'
+Start-Process $($VSCodeSetup.FullName) -ArgumentList $installerArguments -Wait
+#$Extensions = Get-ChildItem -Path E:\SetupFiles\software\VSCodeExtensions
+#foreach ($extension in $extensions) 
+#{
+    #codeExePath --install-extension $extension
+#}
+
 '@
 
     $Job = Invoke-AzVMRunCommand -VMName $VirtualMachineName `
@@ -425,8 +457,8 @@ Start-Process msiexec.exe -ArgumentList "/i $($EdgeBrowser.FullName) /quiet" -Wa
 #region Create AD,CA & ADFS Virtual Machines
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
-    Write-Host "$($VirtualMachineName) - Configuring Hyper-V." -ForegroundColor Green
-    $AdminPassword = ConvertFrom-SecureStringToPlainText -SecurePassword $VirtualMachineAdminPassword -ErrorAction 'Stop'
+    Write-Host "$($VirtualMachineName) - Configuring Hyper-V to host the Domain Controller/Certificate Services & ADFS" -ForegroundColor Green
+    Write-host "$($VirtualMachineName) - This takes about 35 minutes. I am doing lots of work for you. Settle Down..." -ForegroundColor Yellow
 
 $ScriptString = @'
 
@@ -531,7 +563,6 @@ Foreach ($Server in $Servers)
 </unattend>
 "@
 
-
 #oobeSystem
 [XML]$U_Unattend_oobeSysten_AdminPassword=@"
 <unattend xmlns="urn:schemas-microsoft-com:unattend">
@@ -551,7 +582,6 @@ Foreach ($Server in $Servers)
 </unattend>
 "@
 
-
 $U_Unattend.unattend.AppendChild($U_Unattend.ImportNode($U_Unattend_oobeSysten_AdminPassword.unattend.settings, $true))
 $U_Unattend.OuterXml | Out-File ($Prepare_Vhdx_DriveLetter+":\unattend.xml") -Encoding ascii -Force
 
@@ -563,7 +593,7 @@ Foreach ($Server in $Servers)
     New-VM -Name $Server.ServerName -BootDevice VHD -VHDPath ('C:\VMDisks\' + $Server.ServerName + '.vhd') -MemoryStartupBytes 4GB -SwitchName 'ADSwitch'
     Set-VMProcessor -VMName $Server.ServerName -count 2
     Start-VM -Name $Server.ServerName
-    Start-Sleep -Seconds 120
+    Start-Sleep -Seconds 160
     $InterfaceIndex = Invoke-Command -VMName $Server.ServerName -Credential $LocalCredential -ScriptBlock {(Get-NetAdapter).ifIndex}
     Invoke-Command -VMName $Server.ServerName -Credential $LocalCredential -ScriptBlock {
         Set-DnsClientServerAddress -InterfaceIndex $Using:InterfaceIndex -ServerAddresses 10.100.100.10,8.8.8.8;
@@ -571,7 +601,7 @@ Foreach ($Server in $Servers)
     }
     Start-Sleep -Seconds 20
     Get-VM -Name $Server.ServerName | Restart-VM -Force -Wait
-    Start-Sleep -Seconds 120
+    Start-Sleep -Seconds 160
     $InterfaceIndex = Invoke-Command -VMName $Server.ServerName -Credential $LocalCredential -ScriptBlock {(Get-NetAdapter).ifIndex} 
     $IPCheck = Invoke-Command -VMName $Server.ServerName -Credential $LocalCredential -ScriptBlock {Get-NetIPAddress -InterfaceIndex $Using:InterfaceIndex} 
     if ($IPCheck.IPAddress[1] -ne $Server.IPAddress)
@@ -582,8 +612,34 @@ Foreach ($Server in $Servers)
         }
     }
 }
+'@
 
+    $ScriptString = $ScriptString.Replace('[AdminPassword]',"$AdminPassword")
+    $Job = Invoke-AzVMRunCommand -VMName $VirtualMachineName `
+        -ResourceGroupName $LabResourceGroup.ResourceGroupName `
+        -CommandId 'RunPowerShellScript' `
+        -ScriptString $ScriptString -AsJob
+
+    Get-Job -Id $Job.Id | Wait-Job
+
+}
+#endregion
+
+#region Install Active Directory and Configure Certificate Services
+foreach ($VirtualMachineName in $DeployedVirtualMachines)
+{
+
+$ScriptString = @'
 #Configure AD CS
+
+$VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
+
+$Username = '.\Administrator'
+$LocalCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
+
+$Username = 'Contoso\Administrator'
+$DomainCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
+
 Invoke-Command -VMName 'AD-01' -Credential $LocalCredential -ScriptBlock {Install-WindowsFeature AD-Domain-Services -IncludeManagementTools} -Verbose
 Invoke-Command -VMName 'AD-01' -Credential $LocalCredential -ScriptBlock {
 Install-ADDSForest -DomainName "contoso.local" `
@@ -591,7 +647,9 @@ Install-ADDSForest -DomainName "contoso.local" `
     -SafeModeAdministratorPassword $Using:VirtualMachinePassword `
     -DomainNetbiosName Contoso -Force
 }
-Start-Sleep -Seconds 500
+
+Start-Sleep -Seconds 600
+
 Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {Install-WindowsFeature ADCS-Cert-Authority} -Verbose
 Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {Install-WindowsFeature RSAT-ADCS-Mgmt} -Verbose
 Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
@@ -711,15 +769,14 @@ Invoke-Command -VMName 'ADFS-01' -Credential $LocalCredential -ScriptBlock {Add-
         -CommandId 'RunPowerShellScript' `
         -ScriptString $ScriptString -AsJob
 
-    Get-Job -Id $Job.Id | Wait-Job
+    Get-Job -Id $Job.Id | Wait-Job | Get-Job | Wait-Job | Receive-Job
 }
 #endregion
 
-#region Generate Deployment Certificates & removing ADCA.ADFS Servers from Hyper-V
+#region Generate Deployment Certificates
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
-    $AdminPassword = ConvertFrom-SecureStringToPlainText -SecurePassword $VirtualMachineAdminPassword -ErrorAction 'Stop'
-    Write-Host "$($VirtualMachineName) - Generating the Azure Stack Deployment Certificates." -ForegroundColor Green
+   Write-Host "$($VirtualMachineName) - Generating the Azure Stack Deployment Certificates." -ForegroundColor Green
 
 $ScriptString = @'
 $VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
@@ -796,7 +853,12 @@ ConvertTo-AzsPFX -Path $CERPath -pfxPassword $PFXPassword -ExportPath $PFXExport
         -ScriptString $ScriptString -AsJob
 
     Get-Job -Id $Job.Id | Wait-Job
+}
+#endregion
 
+#region Copy Deployment Certificates
+foreach ($VirtualMachineName in $DeployedVirtualMachines)
+{
     Write-Host "$($VirtualMachineName) - Copying the Azure Stack Deployment Certificates." -ForegroundColor Green
 
 $ScriptString = @'
@@ -818,7 +880,12 @@ Remove-PSSession $ADSession
         -ScriptString $ScriptString -AsJob
 
     Get-Job -Id $Job.Id | Wait-Job
+}
+#endregion
 
+#region Create Azure Stack Deployment Script
+foreach ($VirtualMachineName in $DeployedVirtualMachines)
+{
     Write-Host "$($VirtualMachineName) - Creating the Azure Stack Deployment Script." -ForegroundColor Green
 
 $ScriptString = @"
@@ -1117,7 +1184,12 @@ Add-Content -Path `$InstallScript.FullName -Value `$InstallAzureStackPOCScript -
         -ScriptString $ScriptString -AsJob
 
     Get-Job -Id $Job.Id | Wait-Job
+}
+#endregion
 
+#region Remove Hyper-V Virtual Machines
+foreach ($VirtualMachineName in $DeployedVirtualMachines)
+{
     Write-Host "$($VirtualMachineName) - Removing AD & ADFS Virtual Machines." -ForegroundColor Green
 
 $ScriptString = @'
@@ -1139,7 +1211,6 @@ Get-NetAdapter | Where-Object {$_.Name -like "*ADSwitch*"} | Disable-NetAdapter 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
     Write-Host "$($VirtualMachineName) - Starting ASDK Deployment." -ForegroundColor Green
-    $AdminPassword = ConvertFrom-SecureStringToPlainText -SecurePassword $VirtualMachineAdminPassword -ErrorAction 'Stop'
 
 $ScriptString = @"
 `$AADscriptToExecute = @'
@@ -1185,9 +1256,20 @@ Register-ScheduledTask @registrationParams -User "`$env:ComputerName\Administrat
         -ScriptString $ScriptString -AsJob
 
     Get-Job -Id $Job.Id | Wait-Job
+}
+#endregion
 
+#region Restart Server to begin ASDK Install
+foreach ($VirtualMachineName in $DeployedVirtualMachines)
+{
     Write-host "$($VirtualMachineName) - Restarting Virtual Machine. Please wait..." -ForegroundColor Green
     $Job = Restart-AzVM -ResourceGroupName $LabResourceGroup.ResourceGroupName -Name $VirtualMachineName -AsJob
     Get-Job -Id $Job.Id | Wait-Job
 }
 #endregion
+
+Write-Host "Deployment Jobs are complete." -ForegroundColor Green
+Write-Host "Depending on the Virtual Machine Sku, it can take 12-18 Hours to complete the ASDK Install." -ForegroundColor Yellow
+Write-Host "You can connect to the ASDK Virtual Machines using RDP to monitor the progress." -ForegroundColor Green
+Write-Host "Prior to Domain Setup completion, the login UserName will be .\Administrator" -ForegroundColor Green
+Write-Host "Once the ASDK Domain Setup is complete, the login UserName will be AzureStack\AzureStackAdmin" -ForegroundColor Green
