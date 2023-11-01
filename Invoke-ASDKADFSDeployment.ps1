@@ -146,12 +146,15 @@ $Locations = Get-AzLocation
 $Location = $Locations | Out-GridView -Title "Please Select the Azure Resource Deployment Region." -PassThru
 #endregion
 
+Write-Host "Connected to Azure" -ForegroundColor Green
+
 #region Create Resource Group
 $LabResourceGroup = Get-AzResourceGroup -Name $LabResourceGroupName -Location $Location.Location -ErrorAction SilentlyContinue
 If (!($LabResourceGroup))
 {
     $LabResourceGroup = New-AzResourceGroup -Name $LabResourceGroupName -Location $Location.Location
 }
+Write-Host "Resource Group @($LabResourceGroupName) is ready" -ForegroundColor Green
 #endregion
 
 #region Template Deployment
@@ -173,12 +176,18 @@ $TemplateParams = @{
     sourceAddressForRDP = $SourceAddressForRDP
 }
 
+Write-Host "Starting Template Deployment" -ForegroundColor Green
+$StartTime = Get-Date -DisplayHint Time
 $Deployment = New-AzResourceGroupDeployment -Name ASDKDeployment `
     -ResourceGroupName $LabResourceGroup.ResourceGroupName `
     -TemplateUri 'https://raw.githubusercontent.com/RichShillingtonMSFT/Deploy-ASDK-ADFS/main/azuredeploy.json' `
     -TemplateParameterObject $TemplateParams -Mode Incremental
 
+$EndTime = Get-Date -DisplayHint Time
 $DeployedVirtualMachines = $Deployment.Outputs.Values.value
+Write-Host "Template Deployment Complete" -ForegroundColor Green
+Write-Host "Start Time $($StartTime)" -ForegroundColor White
+Write-Host "End Time $($EndTime)" -ForegroundColor White
 #endregion
 
 #region Configure Virtual Machine Disks
