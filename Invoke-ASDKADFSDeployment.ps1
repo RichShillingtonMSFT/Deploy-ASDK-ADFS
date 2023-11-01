@@ -575,7 +575,7 @@ Start-Process msiexec.exe -ArgumentList "/i $($EdgeBrowser.FullName) /quiet" -Wa
 $VSCodeSetup = Get-ChildItem -Path E:\SetupFiles\software -Filter *VSCodeSetup*.exe
 $installerArguments = '/verysilent /tasks=addcontextmenufiles,addcontextmenufolders,addtopath'
 Start-Process $($VSCodeSetup.FullName) -ArgumentList $installerArguments -Wait
-$Extensions = Get-ChildItem -Path 'E:\SetupFiles\software\VSCodeExtensions'
+#$Extensions = Get-ChildItem -Path 'E:\SetupFiles\software\VSCodeExtensions'
 #foreach ($Extension in $Extensions) 
 #{
 #    & "C:\Program Files\Microsoft VS Code\Code.exe" --install-extension $Extension
