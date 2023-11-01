@@ -627,7 +627,7 @@ Start-Process $($VSCodeSetup.FullName) -ArgumentList $installerArguments -Wait
 #endregion
 
 #region Create AD,CA & ADFS Virtual Machines
-Write-Host "Now I must Configure the Hyper-V to host and setup the Domain Controller, Certificate Services & ADFS" -ForegroundColor Yellow
+Write-Host "Now I must Configure the Hyper-V host and setup the Domain Controller, Certificate Services & ADFS" -ForegroundColor Yellow
 Write-host "This takes about 35 minutes. I am doing lots of work for you. Settle Down..." -ForegroundColor Yellow
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
