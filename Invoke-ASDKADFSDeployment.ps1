@@ -936,7 +936,10 @@ $templateDE.ObjectSecurity.AddAccessRule($ace)
 $templateDE.CommitChanges()
 $templateDE.Dispose()
 
+Start-Sleep -Seconds 120
+
 Add-CATemplate -Name "AzureStack" -Force
+
 } -Verbose
 
 winrm s winrm/config/client '@{TrustedHosts="*"}'
@@ -1520,7 +1523,7 @@ Get-NetAdapter | Where-Object {$_.Name -like "*ADSwitch*"} | Disable-NetAdapter 
 }
 #endregion
 
-#region Begin ASDK Install
+#region Setup ASDK Install Job
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
     Write-Host "$($VirtualMachineName) - Starting ASDK Deployment." -ForegroundColor Green
