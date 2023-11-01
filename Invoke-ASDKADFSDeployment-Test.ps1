@@ -6,19 +6,22 @@
     Use this script to deploy ASDKs in Azure that use ADFS for Identity
 
 .EXAMPLE
-    .\Invoke-ASDKADFSDeployment.ps1 -LabResourceGroupName 'ASDK-ADFS-RG' `
-        -DNSForwarder '8.8.8.8' -TimeServer '168.61.215.74' `
-        -VirtualMachineAdminUserName 'VMAdmin' `
-        -ASDKVersion '2108' -VirtualMachineNamePrefix 'HUB' `
-        -VirtualMachineCount '1' -DNSPrefixForPublicIP 'asdk-' `
-
+    .\Invoke-ASDKADFSDeployment.ps1
 #>
 [CmdletBinding()]
 Param
 (
+    # Provide the full UPN for the Azure Active Directory User for ASDK Registration
+	[Parameter(Mandatory=$false,HelpMessage="Provide the full UPN for the Azure Active Directory User for ASDK Registration")]
+    [MailAddress]$AADUserName = 'rishilli@missionreadygov.onmicrosoft.com',
+
     # Provide the Resource Group Name
-	[Parameter(Mandatory=$true,HelpMessage="Provide the Resource Group Name")]
-    [String]$LabResourceGroupName,
+	[Parameter(Mandatory=$false,HelpMessage="Provide the Resource Group Name")]
+    [String]$LabResourceGroupName = 'ASDK-ADFS-RG2',
+
+    # Provide the environment where you will register the ASDK
+	[Parameter(Mandatory=$false,HelpMessage="Provide the environment where you will register the ASDK")]
+    [String]$AzureEnvironment = 'AzureUSGovernment',
 
     # Provide the number of Data Disks for the ASDK
 	[Parameter(Mandatory=$false,HelpMessage="Provide the number of Data Disks for the ASDK")]
@@ -29,38 +32,38 @@ Param
     [String]$DataDiskSizeGB = '2048',
 
     # Provide the DNS Forwarder to be used on the ASDK
-	[Parameter(Mandatory=$true,HelpMessage="Provide the DNS Forwarder to be used on the ASDK")]
-    [String]$DNSForwarder,
+	[Parameter(Mandatory=$false,HelpMessage="Provide the DNS Forwarder to be used on the ASDK")]
+    [String]$DNSForwarder = '8.8.8.8',
 
     # Provide a Time Server IP
-	[Parameter(Mandatory=$true,HelpMessage="Provide a Time Server IP")]
-    [String]$TimeServer,
+	[Parameter(Mandatory=$false,HelpMessage="Provide a Time Server IP")]
+    [String]$TimeServer = '168.61.215.74',
 
     # Provide a Virtual Machine Admin Username
-	[Parameter(Mandatory=$true,HelpMessage="Provide a Virtual Machine Admin Username")]
-    [String]$VirtualMachineAdminUserName,
+	[Parameter(Mandatory=$false,HelpMessage="Provide a Virtual Machine Admin Username")]
+    [String]$VirtualMachineAdminUserName = 'VMAdmin',
 
     # Provide a Virtual Machine Admin Password
 	[Parameter(Mandatory=$true,HelpMessage="Provide a Virtual Machine Admin Password")]
     [SecureString]$VirtualMachineAdminPassword,
 
     # The version of ASDK to be deployed
-	[Parameter(Mandatory=$true,HelpMessage="The version of ASDK to be deployed")]
+	[Parameter(Mandatory=$false,HelpMessage="The version of ASDK to be deployed")]
     [ValidateSet('2301','2206','2108')]
-    [String]$ASDKVersion,
+    [String]$ASDKVersion = '2301',
 
     # The Virtual Machine Name Prefix
-    [Parameter(Mandatory=$true,HelpMessage="The Virtual Machine Name Prefix")]
-    [String]$VirtualMachineNamePrefix,
+    [Parameter(Mandatory=$false,HelpMessage="The Virtual Machine Name Prefix")]
+    [String]$VirtualMachineNamePrefix = 'HUB',
 
-    [Parameter(Mandatory=$true,HelpMessage="Provide the count of ASDKs to Deploy")]
-    [Int]$VirtualMachineCount,
+    [Parameter(Mandatory=$false,HelpMessage="Provide the count of ASDKs to Deploy")]
+    [Int]$VirtualMachineCount = '1',
 
     [Parameter(Mandatory=$false,HelpMessage="Select the Virtual Machine SKU Size.")]
     [String]$VirtualMachineSize = 'Standard_E16s_v3',
 
-    [Parameter(Mandatory=$true,HelpMessage="Provide a DNS Prefix for the Public IP")]
-    [String]$DNSPrefixForPublicIP,
+    [Parameter(Mandatory=$false,HelpMessage="Provide a DNS Prefix for the Public IP")]
+    [String]$DNSPrefixForPublicIP = 'vaasdk-',
 
     [Parameter(Mandatory=$false,HelpMessage="Provide a Name for the Virtual Network")]
     [String]$VirtualNetworkName = 'AzSHub-VNet',
@@ -88,11 +91,7 @@ Param
 )
 
 $ASDKLinkUri = "https://asdkdeploymentsa.blob.core.usgovcloudapi.net/asdks/$ASDKVersion/CloudBuilder.vhdx"
-
-if (!($SourceAddressForRDP))
-{
-    $SourceAddressForRDP = ((Invoke-WebRequest -uri “https://api.ipify.org/”).Content + '/32')
-}
+$SourceAddressForRDP = ((Invoke-WebRequest -uri “https://api.ipify.org/”).Content + '/32')
 
 Function ConvertFrom-SecureStringToPlainText 
 {
@@ -209,6 +208,7 @@ Install-WindowsFeature -Name Hyper-V -IncludeManagementTools
     Get-Job -Id $Job.Id | Wait-Job
 
     Write-host "$($VirtualMachineName) - Downloading Setup files from Azure Storage. This may take some time. Please wait..." -ForegroundColor Green
+
 $ScriptString = @"
 `$InstallFilesDirectory = New-Item -Path C:\ -Name SetupFiles -ItemType Directory -Force;
 Invoke-WebRequest -UseBasicParsing -Uri 'https://aka.ms/downloadazcopy-v10-windows' -OutFile "`$(`$InstallFilesDirectory.FullName)\azcopy.zip";
@@ -383,11 +383,11 @@ bcdboot `$Prepare_Vhdx_DriveLetter':\Windows'
         -CommandId 'RunPowerShellScript' `
         -ScriptString $ScriptString -AsJob
 
-    Get-Job -Id $Job.Id | Wait-Job
+    Get-Job -Id $Job.Id | Wait-Job -Verbose
 
     Write-host "$($VirtualMachineName) - Restarting Virtual Machine. Please wait..." -ForegroundColor Green
     $Job = Restart-AzVM -ResourceGroupName $LabResourceGroup.ResourceGroupName -Name $VirtualMachineName -AsJob
-    Get-Job -Id $Job.Id | Wait-Job
+    Get-Job -Id $Job.Id | Wait-Job -Verbose
 
     Write-host "$($VirtualMachineName) - Waiting a few minutes for the VM to complete setup..." -ForegroundColor Green
     Start-Sleep -Seconds 600
@@ -419,7 +419,8 @@ Start-Process msiexec.exe -ArgumentList "/i $($EdgeBrowser.FullName) /quiet" -Wa
         -CommandId 'RunPowerShellScript' `
         -ScriptString $ScriptString -AsJob
 
-    Get-Job -Id $Job.Id | Wait-Job
+    Get-Job -Id $Job.Id | Wait-Job -Verbose
+
 }
 #endregion
 
@@ -433,9 +434,9 @@ $ScriptString = @'
 
 $VerbosePreference = 'Continue'
 
-New-VMSwitch -SwitchType Internal -Name 'ADSwitch' -Verbose
-$InterfaceIndex = $((Get-NetAdapter | Where-Object {$_.Name -like "*ADSwitch*"} | Select-Object ifIndex).ifIndex)
-New-NetIPAddress -IPAddress '10.100.100.1' -PrefixLength '24' -InterfaceIndex $InterfaceIndex
+#New-VMSwitch -SwitchType Internal -Name 'ADSwitch' -Verbose
+#$InterfaceIndex = $((Get-NetAdapter | Where-Object {$_.Name -like "*ADSwitch*"} | Select-Object ifIndex).ifIndex)
+#New-NetIPAddress -IPAddress '10.100.100.1' -PrefixLength '24' -InterfaceIndex $InterfaceIndex
 
 $Servers = @(
     @{ServerName = 'AD-01';IPAddress = '10.100.100.10'}
@@ -607,7 +608,7 @@ Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
     Install-AdcsCertificationAuthority @params -Force
 }
 
-Start-Sleep -Seconds 120
+Start-Sleep -Seconds 30
 
 Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
 $domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
@@ -716,480 +717,58 @@ Invoke-Command -VMName 'ADFS-01' -Credential $LocalCredential -ScriptBlock {Add-
 }
 #endregion
 
-#region Generate Deployment Certificates & removing ADCA.ADFS Servers from Hyper-V
+#region Generate Deployment Certificates
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
-    $AdminPassword = ConvertFrom-SecureStringToPlainText -SecurePassword $VirtualMachineAdminPassword -ErrorAction 'Stop'
-    Write-Host "$($VirtualMachineName) - Generating the Azure Stack Deployment Certificates." -ForegroundColor Green
-
 $ScriptString = @'
-$VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
 
-$Username = '.\Administrator'
-$LocalCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
-
-$Username = 'Contoso\Administrator'
-$DomainCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
-
-Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
-
-$REQOutputDirectory = 'C:\AzureStackCerts\REQ'
-$IdentitySystem = 'ADFS'
-$RegionName = 'local'
-$ExternalFQDN = 'azurestack.external'
-$Subject = 'C=US,ST=Washington,L=Redmond,O=Microsoft,OU=Azure Stack Hub'
-
-if (!(Test-Path $REQOutputDirectory))
-{
-    New-Item -ItemType Directory -Path $REQOutputDirectory -Force
-}
-
-# Generate certificate signing requests for deployment:
-New-AzsHubDeploymentCertificateSigningRequest -RegionName $RegionName -FQDN $ExternalFQDN -subject $Subject -OutputRequestPath $REQOutputDirectory -IdentitySystem $IdentitySystem
-
-# Azure Container Registry
-New-AzsHubAzureContainerRegistryCertificateSigningRequest -RegionName $RegionName -FQDN $ExternalFQDN -subject $Subject -OutputRequestPath $REQOutputDirectory
-}
-
-Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
-$REQOutputDirectory = "C:\AzureStackCerts\REQ"
-$CEROutputDirectory = "C:\AzureStackCerts\CER"
-Import-Module Microsoft.AzureStack.ReadinessChecker
-if (!(Test-Path $CEROutputDirectory))
-{
-    New-Item -ItemType Directory -Path $CEROutputDirectory -Force
-}
-
-$REQFiles = Get-ChildItem -Path $REQOutputDirectory -Filter *.req
-
-foreach ($REQFile in $REQFiles)
-{
-    $CerFileName = $REQFile.Name.Substring(0,$REQFile.Name.IndexOf('_Cert')) + '.cer'
-    certreq -submit -attrib "CertificateTemplate:AzureStack" -config - $REQFile.FullName.ToString() $CEROutputDirectory\$CerFileName
-}
-
-$RSPFiles = Get-ChildItem -Path $CEROutputDirectory -Filter *.rsp
-foreach ($RSPFile in $RSPFiles)
-{
-    Remove-Item $RSPFile.FullName -Force
-}
-}
-
-Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
-$CERPath = 'C:\AzureStackCerts\CER'
-$PFXExportPath = 'C:\AzureStackCerts\PFX'
-Import-Module Microsoft.AzureStack.ReadinessChecker
-$PFXPassword = '[AdminPassword]' | ConvertTo-SecureString -asPlainText -Force
-
-if (!(Test-Path $PFXExportPath))
-{
-    New-Item -ItemType Directory -Path $PFXExportPath -Force
-}
-
-ConvertTo-AzsPFX -Path $CERPath -pfxPassword $PFXPassword -ExportPath $PFXExportPath
-}
 '@
 
-    $ScriptString = $ScriptString.Replace('[AdminPassword]',"$AdminPassword")
-    $Job = Invoke-AzVMRunCommand -VMName $VirtualMachineName `
-        -ResourceGroupName $LabResourceGroup.ResourceGroupName `
-        -CommandId 'RunPowerShellScript' `
-        -ScriptString $ScriptString -AsJob
 
-    Get-Job -Id $Job.Id | Wait-Job
+}
+#endregion
 
-    Write-Host "$($VirtualMachineName) - Copying the Azure Stack Deployment Certificates." -ForegroundColor Green
 
-$ScriptString = @'
-$VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
-$Username = 'Contoso\Administrator'
-$DomainCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
+
+
+
+
+
+Add-DnsServerConditionalForwarderZone -MasterServers '10.100.100.10' -Name 'contoso.local'
+
+Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
+    if (!(Test-Path 'C:\AzureStackCerts\REQ'))
+    {
+        New-Item -ItemType Directory -Path 'C:\AzureStackCerts\REQ' -Force
+    }
+
+    Start-Process PowerShell -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File ""C:\Scripts\Create-AzSHubDeploymentCertRequests.ps1""' -Verb RunAs -Wait
+}
+
+Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
+    if (!(Test-Path C:\AzureStackCerts\CER))
+    {
+        New-Item -ItemType Directory -Path 'C:\AzureStackCerts\CER' -Force
+    }
+
+    Start-Process PowerShell -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File ""C:\Scripts\Submit-AzSHubCertRequests.ps1""' -Verb RunAs -Wait
+}
+
+Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
+    if (!(Test-Path 'C:\AzureStackCerts\PFX'))
+    {
+        New-Item -ItemType Directory -Path 'C:\AzureStackCerts\PFX' -Force
+    }
+
+    Start-Process PowerShell -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File ""C:\Scripts\Prepare-AzSHubCertificates.ps1""' -Verb RunAs -Wait
+}
 
 Remove-Item -Path 'C:\CloudDeployment\Setup\Certificates\ADFS' -Recurse -Force
 winrm s winrm/config/client '@{TrustedHosts="*"}'
-$ADSession = New-PSSession -ComputerName '10.100.100.10' -Credential $DomainCredential
+$ADSession = New-PSSession -ComputerName '10.100.100.10' -Credential $Credential
 Copy-Item -FromSession $ADSession -Path 'C:\AzureStackCerts\PFX\local.azurestack.external\Deployment' -Destination 'C:\CloudDeployment\Setup\Certificates\ADFS' -Force -Recurse -Container
 Remove-PSSession $ADSession
-'@
 
-    $ScriptString = $ScriptString.Replace('[AdminPassword]',"$AdminPassword")
-    $Job = Invoke-AzVMRunCommand -VMName $VirtualMachineName `
-        -ResourceGroupName $LabResourceGroup.ResourceGroupName `
-        -CommandId 'RunPowerShellScript' `
-        -ScriptString $ScriptString -AsJob
-
-    Get-Job -Id $Job.Id | Wait-Job
-
-    Write-Host "$($VirtualMachineName) - Creating the Azure Stack Deployment Script." -ForegroundColor Green
-
-$ScriptString = @"
-`$InstallScript = New-Item -Path C:\CloudDeployment\Setup -Name InstallAzureStackPOC.ps1 -ItemType File -Force
-
-`$InstallAzureStackPOCScript = @'
-<#############################################################
- #                                                           #
- # Copyright (C) Microsoft Corporation. All rights reserved. #
- #                                                           #
- #############################################################>
-<#
- .Synopsis
-      Unpacks deployment scripts and deploys a one node Azure Stack POC.
- .Parameter AdminPassword
-     Password for the local administrator account and all other accounts that will be created as part of the POC deployment.  Must match the current local administrator password on the host.
- .Parameter InfraAzureDirectoryTenantAdminCredential
-     Sets the Azure Active Directory user name and password. These Azure credentials can be either an Org ID or a Microsoft Account. To use Microsoft Account credentials, do not include this parameter in the cmdlet, thus prompting the Azure Authentication popup during deployment (this will create the authentication and refresh tokens used during deployment).
- .Parameter InfraAzureDirectoryTenantName
-     Sets the tenant directory. Use this parameter to specify a specific directory where the AAD account has permissions to manage multiple directories. Full Name of an AAD Directory Tenant in the format of <directoryName>.onmicrosoft.com.
- .Parameter InfraAzureEnvironment
-     Select which Azure environment to register this Azure Stack Installation with.
- .Parameter DNSForwarder
-     A DNS server is created as part of the Azure Stack deployment. To allow computers inside of the solution to resolve names outside of the stamp, provide your existing infrastructure DNS server. The in-stamp DNS server will forward unknown name resolution requests to this server.
- .Parameter TimeServer
-     Use this parameter to specify a time server.
- .Parameter UseADFS
-    If set, deployment will use ADFS instead of Azure AD.
- .Parameter Rerun
-     Use this flag to re-run idempotent deployment from the last failed step. All previous input will be used.
-     Re-entering data once provided is not supported because several unique values are generated and used for deployment.
- .Parameter BackupStorePath
-    The external SMB share to retrieve and store backup data.
- .Parameter BackupStoreCredential
-    Credential required to access the external SMB share to retrieve and store backup data.
- .Parameter BackupDecryptionCertPassword
-    Backup data decryption cert password
-.Example
-     If no parameters are provided, the script prompts for input and uses DHCP for NAT.
-     InstallAzureStackPOC.ps1
-.Example
-     # If you need to re-run a failed deployment use this flag, which restarts deployment using all previous input from the failure point. 
-     InstallAzureStackPOC.ps1 -Rerun 
-#>
-[CmdletBinding(SupportsShouldProcess=`$true, ConfirmImpact="Medium", PositionalBinding=`$false, DefaultParameterSetName="DefaultSet")]
-param (
-    [Parameter(Mandatory=`$true, ParameterSetName="DefaultSet")]
-    [Parameter(Mandatory=`$true, ParameterSetName="ADFSSet")]
-    [Parameter(Mandatory=`$true, ParameterSetName="RestoreSet")]
-    [ValidateNotNullOrEmpty()]
-    [SecureString]
-    `$AdminPassword,
-    [Parameter(Mandatory=`$false, ParameterSetName="DefaultSet")]
-    [Parameter(Mandatory=`$false, ParameterSetName="RestoreSet")]
-    [ValidateNotNullOrEmpty()]
-    [PSCredential]
-    `$InfraAzureDirectoryTenantAdminCredential,
-    [Parameter(Mandatory=`$false, ParameterSetName="DefaultSet")]
-    [Parameter(Mandatory=`$false, ParameterSetName="RestoreSet")]
-    [ValidateNotNullOrEmpty()]
-    [String]
-    `$InfraAzureDirectoryTenantName,
-    [Parameter(Mandatory=`$false, ParameterSetName="DefaultSet")]
-    [Parameter(Mandatory=`$false, ParameterSetName="RestoreSet")]
-    [ValidateSet("AzureCloud", "AzureChinaCloud", "AzureGermanCloud", "AzureUSGovernment", "CustomCloud")]
-    [String]
-    `$InfraAzureEnvironment = "AzureCloud",
-    [Parameter(Mandatory=`$false, ParameterSetName="RestoreSet")]
-    [Parameter(Mandatory=`$false, ParameterSetName="DefaultSet")]
-    [Parameter(Mandatory=`$false, ParameterSetName="ADFSSet")]
-    [ValidateNotNullOrEmpty()]
-    [String[]]
-    `$DNSForwarder,
-    [Parameter(Mandatory=`$true, ParameterSetName="DefaultSet")]
-    [Parameter(Mandatory=`$true, ParameterSetName="ADFSSet")]
-    [Parameter(Mandatory=`$true, ParameterSetName="RestoreSet")]
-    [ValidateNotNullOrEmpty()]
-    [string]
-    `$TimeServer,
-    [Parameter(Mandatory=`$false, ParameterSetName="ADFSSet")]
-    [Switch]
-    `$UseADFS,
-    [Parameter(Mandatory=`$false, ParameterSetName="DefaultSet")]
-    [Parameter(Mandatory=`$false, ParameterSetName="ADFSSet")]
-    [Parameter(Mandatory=`$false, ParameterSetName="RestoreSet")]
-    [ValidateRange(0,3)]
-    [int]
-    `$InternalRetryAttempts = 2,
-    [Parameter(Mandatory=`$true, ParameterSetName="RerunSet")]
-    [Switch]
-    `$Rerun,
-    [Parameter(Mandatory=`$false)]
-    [ValidateNotNullOrEmpty()]
-    [String]
-    `$DeploymentScriptPath = "`$env:SystemDrive\CloudDeployment\Setup\DeploySingleNode.ps1",
-    [Parameter(Mandatory=`$false)]
-    [ValidateNotNullOrEmpty()]
-    [string]
-    `$NuGetManifestPath = "`$env:SystemDrive\CloudDeployment\Setup\CloudBuilderNuGets.xml",
-    [Parameter(Mandatory=`$false)]
-    [ValidateNotNullOrEmpty()]
-    [string]
-    `$NugetStorePath = "`$env:SystemDrive\CloudDeployment\NuGetStore",
-    [Parameter(Mandatory=`$false)]
-    [switch]
-    `$ForceUnpack = `$false,
-    [Parameter(Mandatory=`$false, ParameterSetName="DefaultSet")]
-    [Parameter(Mandatory=`$false, ParameterSetName="ADFSSet")]
-    [Parameter(Mandatory=`$true, ParameterSetName="RestoreSet")]
-    [ValidateNotNullOrEmpty()]
-    [string]
-    `$BackupStorePath,
-    [Parameter(Mandatory=`$false, ParameterSetName="DefaultSet")]
-    [Parameter(Mandatory=`$false, ParameterSetName="ADFSSet")]
-    [Parameter(Mandatory=`$true, ParameterSetName="RestoreSet")]
-    [ValidateNotNullOrEmpty()]
-    [PSCredential]
-    `$BackupStoreCredential,
-    [Parameter(Mandatory=`$false, ParameterSetName="DefaultSet")]
-    [Parameter(Mandatory=`$false, ParameterSetName="ADFSSet")]
-    [Parameter(Mandatory=`$true, ParameterSetName="RestoreSet")]
-    [ValidateNotNullOrEmpty()]
-    [SecureString]
-    `$BackupDecryptionCertPassword,
-    [Parameter(Mandatory=`$true, ParameterSetName="RestoreSet")]
-    [ValidateNotNullOrEmpty()]
-    [Guid]
-    `$BackupId,
-    [Parameter(Mandatory=`$true, ParameterSetName="RestoreSet")]
-    [ValidateNotNullOrEmpty()]
-    [SecureString]
-    `$ExternalCertPassword,
-    [Parameter(Mandatory=`$false)]
-    [ValidateNotNullOrEmpty()]
-    [SecureString]
-    `$SqlActivationKey,
-    
-    [Parameter(Mandatory=`$false)]
-    [string] `$WPADConfigIP,
-    [Parameter(Mandatory=`$false)]
-    [string] `$ProxyIPAddress,
-    [Parameter(Mandatory=`$false)]
-    [ValidateRange(0, 65535)]
-    [int] `$ProxyIPPort,
-    [Parameter(Mandatory=`$false, ParameterSetName="DefaultSet")]
-    [Parameter(Mandatory=`$false, ParameterSetName="ADFSSet")]
-    [string]`$CloudJSONFilePath
-)
-Write-Verbose "Getting `$PSBoundParameters"
-`$PassthroughParameters = `$PSBoundParameters
-`$null = `$PassthroughParameters.Remove("DeploymentScriptPath")
-`$null = `$PassthroughParameters.Remove("NuGetManifestPath")
-`$null = `$PassthroughParameters.Remove("NugetStorePath")
-`$null = `$PassthroughParameters.Remove("ForceUnpack")
-if (!`$ForceUnpack -and (Test-Path `$DeploymentScriptPath))
-{
-    Write-Verbose "Deployment NuGets have already been unpacked. Calling `$DeploymentScriptPath."
-}
-else
-{
-    . "`$PSScriptRoot\BootstrapAzureStackDeployment.ps1" -NuGetManifestPath `$NuGetManifestPath -NugetStorePath `$NugetStorePath
-}
-if (`$PassthroughParameters.ContainsKey('CloudJSONFilePath'))
-{
-    if (Test-Path `$CloudJSONFilePath)
-    {
-        `$cloudJson = Get-Content `$CloudJSONFilePath -Raw | ConvertFrom-Json
-        `$cloudJsonContent = `$cloudJson.DeploymentData
-        if(`$cloudJsonContent.CustomEnvironmentEndpoints.CustomCloudARMEndpoint)
-        {
-            `$PassthroughParameters.Add("CustomCloudARMEndpoint", `$cloudJsonContent.CustomEnvironmentEndpoints.CustomCloudARMEndpoint)
-        }
-        if (`$cloudJsonContent.CustomEnvironmentEndpoints.ExternalDSMSEndpoint)
-        {
-            `$PassthroughParameters.Add("ExternalDSMSEndpoint", `$cloudJsonContent.CustomEnvironmentEndpoints.ExternalDSMSEndpoint)
-        }
-        
-        if (`$cloudJsonContent.PEPPublicCert)
-        {
-            try
-            {
-                `$cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2
-                `$cert.Import([System.Convert]::FromBase64String(`$cloudJsonContent.PEPPublicCert))
-            }
-            catch
-            {
-                throw (`$LocalizedData.PEPPublicCertInvalid)
-            }
-            `$PassthroughParameters.Add("PEPPublicCert", `$cloudJsonContent.PEPPublicCert)
-        }
-        if (`$cloudJsonContent.ExternalDSMSIssuers)
-        {
-            `$PassthroughParameters.Add("ExternalDSMSIssuer", `$cloudJsonContent.ExternalDSMSIssuers)
-        }
-        if (`$cloudJsonContent.CustomCloudVerificationKey)
-        {
-            `$PassthroughParameters.Add("CustomCloudVerificationKey", `$cloudJsonContent.CustomCloudVerificationKey)
-        }
-    }
-    `$null = `$PassthroughParameters.Remove("CloudJSONFilePath")
-}
-if (`$PSCmdlet.ParameterSetName -eq "RestoreSet")
-{
-    # Add parameters from backup
-    Import-Module "`$env:SystemDrive\CloudDeployment\Setup\RestoreDeploymentParametersHelper.psm1"
-    Import-Module "`$env:SystemDrive\CloudDeployment\Common\RestoreHelpers.psm1"
-    # Get deployment related parameters from the backup
-    `$backupDecryptionCertBase64 = Get-DecryptionCertBase64
-    `$ParameterFromBackup = Get-AsDeploymentParameterFromBackup `
-        -BackupStorePath `$BackupStorePath `
-        -BackupStoreCredential `$BackupStoreCredential `
-        -DecryptionCertBase64 `$backupDecryptionCertBase64 `
-        -DecryptionCertPassword `$BackupDecryptionCertPassword `
-        -BackupId `$BackupId `
-        -VersionCheck -Verbose
-    Add-ParametersFromBackup -ParamHash `$PassthroughParameters -ParameterFromBackup `$ParameterFromBackup
-    `$null = `$PassthroughParameters.Remove("CompanyName")
-    `$null = `$PassthroughParameters.Remove("DVMName")
-    `$null = `$PassthroughParameters.Remove("AzureStackEnhancedEncryptionMethod")
-    `$null = `$PassthroughParameters.Remove("LegalNoticeCaption")
-    `$null = `$PassthroughParameters.Remove("LegalNoticeText")
-    # NOTE: ExternalDomainFQDN from the backup is actually just ExternalDomainSuffix.
-    `$PassthroughParameters.Add("ExternalDomainSuffix", `$ParameterFromBackup.ExternalDomainFQDN)
-    `$null = `$PassthroughParameters.Remove("ExternalDomainFQDN")
-    # Pass through the unwrapped key if decryption cert is specified
-    if (![string]::IsNullOrEmpty(`$backupDecryptionCertBase64) -and `$BackupDecryptionCertPassword)
-    {
-        `$restoreTempFolder = "`$env:SystemDrive\CloudDeployment\RestoreTempFolder"
-        `$roleNames = @("ECE", "Domain", "CertificateManagement")
-        if (`$ParameterFromBackup.UseADFS)
-        {
-            `$roleNames += "ADFS"
-        }
-        try
-        {
-            `$drive = New-PSDrive -Name Backup -Root `$BackupStorePath -PSProvider FileSystem -Credential `$BackupStoreCredential
-            `$backupId = `$ParamHash["BackupId"]
-            `$allSnapshotsFromBackup = Get-ChildItem "`$BackupStorePath\MASBackup\progressivebackup" -Recurse -Filter "*`$BackupId*"
-            foreach (`$roleName in `$roleNames)
-            {
-                `$repos = `$allSnapshotsFromBackup | ? { `$_.Directory.Name.StartsWith("`$roleName;") -and `$_ -like "*.zip"}
-                foreach (`$repo in `$repos)
-                {
-                    `$s = `$repo.Directory.Name -split ";"
-                    Write-Output "Downloading backup '`$(`$repo.FullName)' to `$restoreTempFolder"
-                    Copy-AsBackupData -BackupId `$BackupId `
-                        -BackupStorePath `$BackupStorePath `
-                        -ShareCredential `$BackupStoreCredential `
-                        -DecryptionCertBase64 `$backupDecryptionCertBase64 `
-                        -DecryptionCertPassword `$BackupDecryptionCertPassword `
-                        -TargetPath `$restoreTempFolder `
-                        -RoleName `$s[0] `
-                        -ComponentName `$s[1] `
-                        -PartitionId `$s[2] `
-                        -RepositoryName `$s[3]
-                }
-            }
-        }
-        catch
-        {
-            throw "Cannot download backup data. Exception: `$_"
-        }
-        finally
-        {
-            try
-            {
-                `$drive | Remove-PSDrive -ErrorAction Stop
-            }
-            catch {}
-        }
-        `$PassthroughParameters["BackupDecryptionCertBase64"] = `$backupDecryptionCertBase64
-    }
-}
-`$ExternalCertPassword = ConvertTo-SecureString '[AdminPassword]' -AsPlainText -Force 
-`$PassthroughParameters.Add("ExternalCertPassword", `$ExternalCertPassword)
-if (!(Test-Path `$DeploymentScriptPath))
-{
-    Throw "Deployment Scripts are not at the expected location: `$DeploymentScriptPath"
-}
-else
-{
-    Write-Output "CloudDeployment NuGets have finished unpacking. Calling `$DeploymentScriptPath."
-    . `$DeploymentScriptPath @PassthroughParameters
-    return
-}
-'@
-
-Add-Content -Path `$InstallScript.FullName -Value `$InstallAzureStackPOCScript -Force | Set-Content -Force
-
-"@
-
-    $ScriptString = $ScriptString.Replace('[AdminPassword]',"$AdminPassword")
-    $Job = Invoke-AzVMRunCommand -VMName $VirtualMachineName `
-        -ResourceGroupName $LabResourceGroup.ResourceGroupName `
-        -CommandId 'RunPowerShellScript' `
-        -ScriptString $ScriptString -AsJob
-
-    Get-Job -Id $Job.Id | Wait-Job
-
-    Write-Host "$($VirtualMachineName) - Removing AD & ADFS Virtual Machines." -ForegroundColor Green
-
-$ScriptString = @'
 Get-vm | Stop-VM -Force
 Get-vm | Remove-VM -Force
 Get-NetAdapter | Where-Object {$_.Name -like "*ADSwitch*"} | Disable-NetAdapter -Confirm:$false
-'@
-
-    $Job = Invoke-AzVMRunCommand -VMName $VirtualMachineName `
-        -ResourceGroupName $LabResourceGroup.ResourceGroupName `
-        -CommandId 'RunPowerShellScript' `
-        -ScriptString $ScriptString -AsJob
-
-    Get-Job -Id $Job.Id | Wait-Job
-}
-#endregion
-
-#region Begin ASDK Install
-foreach ($VirtualMachineName in $DeployedVirtualMachines)
-{
-    Write-Host "$($VirtualMachineName) - Starting ASDK Deployment." -ForegroundColor Green
-    $AdminPassword = ConvertFrom-SecureStringToPlainText -SecurePassword $VirtualMachineAdminPassword -ErrorAction 'Stop'
-    $AADPassword = ConvertFrom-SecureStringToPlainText -SecurePassword $AzureADCredential.Password -ErrorAction 'Stop'
-
-$ScriptString = @"
-`$AADscriptToExecute = @'
-    net stop w32time | w32tm /unregister | w32tm /register | net start w32time | 
-    w32tm /resync /rediscover | w32tm /config /manualpeerlist:`$TimeServer /syncfromflags:MANUAL /reliable:yes /update | w32tm /query /status 
-
-    `$adminpass = ConvertTo-SecureString '[AdminPassword]' -AsPlainText -Force 
-    cd C:\CloudDeployment\Setup
-    .\InstallAzureStackPOC.ps1 -AdminPassword `$adminpass -TimeServer [TimeServerIp] -DNSForwarder [DNSForwarder] -UseADFS
-'@
-
-        
-#Autologon
-`$AutoLogonRegPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon"
-Set-ItemProperty -Path `$AutoLogonRegPath -Name "AutoAdminLogon" -Value "1" -type String 
-Set-ItemProperty -Path `$AutoLogonRegPath -Name "DefaultUsername" -Value "`$env:ComputerName\Administrator" -type String  
-Set-ItemProperty -Path `$AutoLogonRegPath -Name "DefaultPassword" -Value "[AdminPassword]" -type String
-Set-ItemProperty -Path `$AutoLogonRegPath -Name "AutoLogonCount" -Value "1" -type DWord
-
-`$action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument `$AADscriptToExecute
-
-`$registrationParams = @{
-	TaskName = 'ASDKDeployment'
-	TaskPath = '\'
-	Action = `$action
-	Settings = New-ScheduledTaskSettingsSet -Priority 4
-	Force = `$true
-	Trigger = New-JobTrigger -AtLogOn
-	Runlevel = 'Highest'
-}
-# The order of the script matters
-
-Register-ScheduledTask @registrationParams -User "`$env:ComputerName\Administrator"
-"@
-   
-    $ScriptString = $ScriptString.Replace('[AdminPassword]',"$AdminPassword")
-    $ScriptString = $ScriptString.Replace('[TimeServerIp]',"$TimeServer")
-    $ScriptString = $ScriptString.Replace('[DNSForwarder]',"$DNSForwarder")
-
-    $Job = Invoke-AzVMRunCommand -VMName $VirtualMachineName `
-        -ResourceGroupName $LabResourceGroup.ResourceGroupName `
-        -CommandId 'RunPowerShellScript' `
-        -ScriptString $ScriptString -AsJob
-
-    Get-Job -Id $Job.Id | Wait-Job
-
-    Write-host "$($VirtualMachineName) - Restarting Virtual Machine. Please wait..." -ForegroundColor Green
-    $Job = Restart-AzVM -ResourceGroupName $LabResourceGroup.ResourceGroupName -Name $VirtualMachineName -AsJob
-    Get-Job -Id $Job.Id | Wait-Job
-}
-#endregion
