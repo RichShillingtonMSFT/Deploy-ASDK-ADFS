@@ -401,7 +401,7 @@ If (Test-Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Autoplay
 }
 
 #Add bootfiles to OS
-Write-Host "Addiing bootfiles to OS"
+Write-Host "Adding bootfiles to OS"
 bcdboot `$Prepare_Vhdx_DriveLetter':\Windows'
 
 #Add Boot entry
