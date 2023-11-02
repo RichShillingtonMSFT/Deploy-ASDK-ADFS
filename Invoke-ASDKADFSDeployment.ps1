@@ -977,12 +977,14 @@ Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
     Expand-Archive -Path "C:\Scripts.zip" -DestinationPath "C:\Scripts" -Force
 }
 
-Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {Restart-Computer -Force -Wait 0}
+Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {Restart-Computer -Force -Wait 0} -Verbose -ErrorAction 'Stop'
 
-Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {Add-CATemplate -Name "AzureStack" -Force}
+Start-Sleep -Seconds 120
+
+Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {Add-CATemplate -Name "AzureStack" -Force} -Verbose -ErrorAction 'Stop'
 
 # Configure ADFS
-Invoke-Command -VMName 'ADFS-01' -Credential $LocalCredential -ScriptBlock {Add-Computer -DomainName 'Contoso.local' -Credential $Using:DomainCredential -Restart} -Verbose
+Invoke-Command -VMName 'ADFS-01' -Credential $LocalCredential -ScriptBlock {Add-Computer -DomainName 'Contoso.local' -Credential $Using:DomainCredential -Restart} -Verbose -ErrorAction 'Stop'
 '@
 
     $ScriptString = $ScriptString.Replace('[AdminPassword]',"$AdminPassword")
