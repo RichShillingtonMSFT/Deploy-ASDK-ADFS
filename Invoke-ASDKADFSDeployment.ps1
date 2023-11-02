@@ -1002,6 +1002,8 @@ Invoke-Command -VMName 'ADFS-01' -Credential $LocalCredential -ScriptBlock {Add-
 #endregion
 
 #region Generate Deployment Certificates
+Write-Host "Now we are getting close. Just a few more things to take care of..." -ForegroundColor Yellow
+
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
    Write-Host "$($VirtualMachineName) - Generating the Azure Stack Deployment Certificates." -ForegroundColor Green
