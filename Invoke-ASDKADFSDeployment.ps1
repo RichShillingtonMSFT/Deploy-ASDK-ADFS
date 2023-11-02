@@ -1966,8 +1966,9 @@ Write-Host $('Total Duration: {0:mm} min {0:ss} sec' -f ($ScriptEndTime-$ScriptS
 Write-Host ''
 Write-Host "Depending on the Virtual Machine Sku, it can take 12-18 Hours to complete the ASDK Install." -ForegroundColor Yellow
 Write-Host ''
-Write-Host "You can connect to the ASDK Virtual Machines using RDP to monitor the progress." -ForegroundColor Green
-Write-Host "A list of VMs and their Public IPs can be found here:"$ENV:UserProfile\Documents\$CSVFileName"" -ForegroundColor Green
-Write-Host ''
-Write-Host "Prior to Domain Setup completion, the login UserName will be .\Administrator" -ForegroundColor Green
-Write-Host "Once the ASDK Domain Setup is complete, the login UserName will be AzureStack\AzureStackAdmin" -ForegroundColor Green
+Write-Host "You can connect to the ASDK Virtual Machines using RDP to monitor the progress." -ForegroundColor White
+Write-Host "A list of VMs and their Public IPs can be found here:" -ForegroundColor White
+Write-Host "$ENV:UserProfile\Documents\$CSVFileName" -ForegroundColor Green
+Write-Host ""
+Write-Host "Prior to Domain Setup completion, the login UserName will be .\Administrator" -ForegroundColor White
+Write-Host "Once the ASDK Domain Setup is complete, the login UserName will be AzureStack\AzureStackAdmin" -ForegroundColor White
