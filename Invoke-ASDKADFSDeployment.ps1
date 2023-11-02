@@ -1042,7 +1042,7 @@ Stop-Transcript
 
         $EndTime = Get-Date -DisplayHint Time
 
-        if ($Result.Value.Message -like "*error*") 
+        if (($Result.Value.Message -contains "error") -and ($Result.Value.Message -notlike "*errorid*")) 
         {
             throw $($Error[0])
             break
@@ -1069,7 +1069,8 @@ Pause
 #region Make the Azure Stack Certificate Template available and join ADFS to the Domain
 $NowTime = Get-Date -DisplayHint Time
 Write-Host "Now I am going to make the Azure Stack Certificate Template available and join ADFS to the Domain." -ForegroundColor Yellow
-Write-Host $('It has only been like {0:mm} minutes since we started this script. Calm Down!.. It is getting there.' -f ($NowTime-$ScriptStartTime)) -ForegroundColor Yellow
+Write-Host "This should take less than 4 minutes." -ForegroundColor Yellow
+Write-Host $('Calm Down! It has only been like {0:mm} minutes since we started this script. It is getting there.' -f ($NowTime-$ScriptStartTime)) -ForegroundColor Yellow
 Write-Host ""
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
