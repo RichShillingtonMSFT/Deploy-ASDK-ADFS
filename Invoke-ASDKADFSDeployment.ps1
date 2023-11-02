@@ -838,7 +838,8 @@ Foreach ($Server in $Servers)
 #endregion
 
 #region Install Active Directory and Configure Certificate Services
-Write-Host "It has only been like 15 minutes. Calm Down!.. It is getting there." -ForegroundColor Yellow
+$NowTime = Get-Date -DisplayHint Time
+Write-Host $('It has only been like {0:mm} minutes. Calm Down!.. It is getting there.' -f ($NowTime-$SciptStartTime)) -ForegroundColor Yellow
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
