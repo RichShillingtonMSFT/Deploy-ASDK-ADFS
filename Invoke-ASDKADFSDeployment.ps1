@@ -91,6 +91,8 @@ $WarningPreference = 'SilentlyContinue'
 
 $ScriptStartTime = Get-Date -DisplayHint Time
 
+$TemplateUri = 'https://raw.githubusercontent.com/RichShillingtonMSFT/Deploy-ASDK-ADFS/main/azuredeploy.json'
+
 $ASDKLinkUri = "https://asdkdeploymentsa.blob.core.usgovcloudapi.net/asdks/$ASDKVersion/CloudBuilder.vhdx"
 
 if (!($SourceAddressForRDP))
@@ -194,7 +196,7 @@ $StartTime = Get-Date -DisplayHint Time
 
 $Deployment = New-AzResourceGroupDeployment -Name ASDKDeployment `
     -ResourceGroupName $LabResourceGroup.ResourceGroupName `
-    -TemplateUri 'https://raw.githubusercontent.com/RichShillingtonMSFT/Deploy-ASDK-ADFS/main/azuredeploy.json' `
+    -TemplateUri $TemplateUri `
     -TemplateParameterObject $TemplateParams -Mode Incremental
 
 $EndTime = Get-Date -DisplayHint Time
