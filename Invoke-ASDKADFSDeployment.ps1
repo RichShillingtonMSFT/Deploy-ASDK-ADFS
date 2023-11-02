@@ -316,7 +316,7 @@ Write-Host ""
 
 #region Restart Virtual Machines
 Write-host "Now I need to restart the Virtual Machines." -ForegroundColor Yellow
-Write-host "This takes about 2 minutes. Please wait..." -ForegroundColor Yellow
+Write-host "This can take up to 5 minutes. Please wait..." -ForegroundColor Yellow
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
@@ -538,7 +538,7 @@ Write-Host ""
 
 #region Restart Virtual Machines
 Write-host "Now I need to restart the Virtual Machines." -ForegroundColor Yellow
-Write-host "This takes about 2 minutes. Please wait..." -ForegroundColor Yellow
+Write-host "This can take up to 5 minutes. Please wait..." -ForegroundColor Yellow
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
@@ -1664,7 +1664,7 @@ Write-Host ""
 
 #region Restart Server to begin ASDK Install
 Write-host "Now I need to restart the Virtual Machines." -ForegroundColor Yellow
-Write-host "This takes about 2 minutes. Please wait..." -ForegroundColor Yellow
+Write-host "This can take up to 5 minutes. Please wait..." -ForegroundColor Yellow
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
