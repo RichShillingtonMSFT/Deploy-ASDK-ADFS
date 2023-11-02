@@ -946,21 +946,22 @@ $ace = [System.DirectoryServices.ActiveDirectoryAccessRule]::new(
 $templateDE.ObjectSecurity.AddAccessRule($ace)
 $templateDE.CommitChanges()
 $templateDE.Dispose()
-
-Start-Sleep -Seconds 120
-
-Add-CATemplate -Name "AzureStack" -Force
-
+Start-Sleep -Seconds 200
 } -Verbose
 
 winrm s winrm/config/client '@{TrustedHosts="*"}'
+
 $ADSession = New-PSSession -ComputerName 'AD-01' -Credential $DomainCredential
+
 Copy-Item E:\SetupFiles\software\HubModules.zip -Destination C:\ -ToSession $ADSession
 Copy-Item E:\SetupFiles\software\Scripts.zip -Destination C:\ -ToSession $ADSession
+
 Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
-Expand-Archive -Path "C:\HubModules.zip" -DestinationPath "$env:ProgramFiles\WindowsPowerShell\Modules" -Force
-Expand-Archive -Path "C:\Scripts.zip" -DestinationPath "C:\Scripts" -Force
+    Expand-Archive -Path "C:\HubModules.zip" -DestinationPath "$env:ProgramFiles\WindowsPowerShell\Modules" -Force
+    Expand-Archive -Path "C:\Scripts.zip" -DestinationPath "C:\Scripts" -Force
 }
+
+Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {Add-CATemplate -Name "AzureStack" -Force}
 
 # Configure ADFS
 Invoke-Command -VMName 'ADFS-01' -Credential $LocalCredential -ScriptBlock {Add-Computer -DomainName 'Contoso.local' -Credential $Using:DomainCredential -Restart} -Verbose
