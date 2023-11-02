@@ -17,7 +17,7 @@
     },
     "virtualMachineNamePrefix": {
       "type": "string",
-      "defaultValue": "va",
+      "defaultValue": "HUB",
       "maxLength": 15,
       "metadata": {
         "description": "Name of the virtual machine to be created"
