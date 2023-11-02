@@ -855,7 +855,7 @@ Write-Host ""
 
 #region Install Active Directory and Configure Certificate Services
 $NowTime = Get-Date -DisplayHint Time
-Write-Host $('It has only been like {0:mm} minutes. Calm Down!.. It is getting there.' -f ($NowTime-$SciptStartTime)) -ForegroundColor Yellow
+Write-Host $('It has only been like {0:mm} minutes. Calm Down!.. It is getting there.' -f ($NowTime-$ScriptStartTime)) -ForegroundColor Yellow
 Write-Host ""
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
