@@ -872,8 +872,8 @@ Foreach ($Server in $Servers)
 
 #region Install Active Directory and Configure Certificate Services
 $NowTime = Get-Date -DisplayHint Time
-Write-Host "Now I will install Active Directory & Certificate Services."
-Write-Host "I will also create the Azure Stack Deployment Certificate Template."
+Write-Host "Now I will install Active Directory & Certificate Services." -ForegroundColor Yellow
+Write-Host "I will also create the Azure Stack Deployment Certificate Template." -ForegroundColor Yellow
 Write-Host $('It has only been like {0:mm} minutes since we started this script. Calm Down!.. It is getting there.' -f ($NowTime-$ScriptStartTime)) -ForegroundColor Yellow
 Write-Host ""
 
