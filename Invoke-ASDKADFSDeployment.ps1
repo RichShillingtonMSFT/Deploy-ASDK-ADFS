@@ -181,6 +181,7 @@ $TemplateParams = @{
 
 Write-Host "Starting Template Deployment" -ForegroundColor Green
 Write-Host ""
+
 $StartTime = Get-Date -DisplayHint Time
 $Deployment = New-AzResourceGroupDeployment -Name ASDKDeployment `
     -ResourceGroupName $LabResourceGroup.ResourceGroupName `
@@ -204,6 +205,7 @@ Write-Host ""
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
     Write-host "$($VirtualMachineName) - Configure the Virtual Machine Disks & Install Hyper-V." -ForegroundColor Green
+    Write-Host ""
 
 $ScriptString = @"
 `@'
@@ -237,6 +239,7 @@ Install-WindowsFeature -Name Hyper-V -IncludeManagementTools
         if ($Result.Value.Message -like "*error*") 
         {
             throw $($Error[0])
+            break
         }
         else
         {
@@ -245,8 +248,7 @@ Install-WindowsFeature -Name Hyper-V -IncludeManagementTools
             Write-Host "StartTime $($StartTime)" -ForegroundColor White
             Write-Host "EndTime $($EndTime)" -ForegroundColor White
             Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
-Write-Host ""
-            
+            Write-Host ""
         }
     }
     catch
@@ -266,6 +268,7 @@ Write-Host ""
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
     Write-host "$($VirtualMachineName) - Downloading Setup files from Azure Storage." -ForegroundColor Green
+    Write-Host ""
 
 $ScriptString = @'
 $InstallFilesDirectory = New-Item -Path C:\ -Name SetupFiles -ItemType Directory -Force;
@@ -298,6 +301,7 @@ azcopy copy 'https://asdkdeploymentsa.blob.core.usgovcloudapi.net/software' $($I
         if ($Result.Value.Message -like "*error*") 
         {
             throw $($Error[0])
+            break
         }
         else
         {
@@ -306,8 +310,7 @@ azcopy copy 'https://asdkdeploymentsa.blob.core.usgovcloudapi.net/software' $($I
             Write-Host "StartTime $($StartTime)" -ForegroundColor White
             Write-Host "EndTime $($EndTime)" -ForegroundColor White
             Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
-Write-Host ""
-            
+            Write-Host ""
         }
     }
     catch
@@ -340,6 +343,7 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
         if ($Result.Value.Message -like "*error*") 
         {
             throw $($Error[0])
+            break
         }
         else
         {
@@ -348,8 +352,7 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
             Write-Host "StartTime $($StartTime)" -ForegroundColor White
             Write-Host "EndTime $($EndTime)" -ForegroundColor White
             Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
-Write-Host ""
-            
+            Write-Host ""
         }
     }
     catch
@@ -369,11 +372,11 @@ Write-Host ""
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
     Write-Host "$($VirtualMachineName) - Preparing Virtual Machine VHDs and Configuring it for VHD Boot." -ForegroundColor Green
+    Write-Host ""
 
 $ScriptString = @"
 Import-Module Hyper-V
 
-#Convert-VHD -Path "C:\SetupFiles\CloudBuilder.vhdx" -VHDType Fixed -DestinationPath "C:\SetupFiles\ASDK.vhdx" -DeleteSource -ErrorAction Stop
 Rename-Item -Path C:\SetupFiles\CloudBuilder.vhdx -NewName ASDK.vhdx -Force
 Resize-VHD -Path "C:\SetupFiles\ASDK.vhdx" -SizeBytes 650gb
 
@@ -522,6 +525,7 @@ bcdboot `$Prepare_Vhdx_DriveLetter':\Windows'
         if ($Result.Value.Message -like "*error*") 
         {
             throw $($Error[0])
+            break
         }
         else
         {
@@ -530,8 +534,7 @@ bcdboot `$Prepare_Vhdx_DriveLetter':\Windows'
             Write-Host "StartTime $($StartTime)" -ForegroundColor White
             Write-Host "EndTime $($EndTime)" -ForegroundColor White
             Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
-Write-Host ""
-            
+            Write-Host ""
         }
     }
     catch
@@ -551,6 +554,8 @@ Write-Host ""
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
     Write-host "$($VirtualMachineName) - Restarting Virtual Machine." -ForegroundColor Green
+    Write-Host ""
+
     try
     {
         $StartTime = Get-Date -DisplayHint Time
@@ -564,6 +569,7 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
         if ($Result.Value.Message -like "*error*") 
         {
             throw $($Error[0])
+            break
         }
         else
         {
@@ -572,8 +578,7 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
             Write-Host "StartTime $($StartTime)" -ForegroundColor White
             Write-Host "EndTime $($EndTime)" -ForegroundColor White
             Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
-Write-Host ""
-            
+            Write-Host ""
         }
     }
     catch
@@ -598,6 +603,7 @@ Write-Host ""
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
     Write-Host "$($VirtualMachineName) - Resizing the OS Disk and Installing Software." -ForegroundColor Green
+    Write-Host ""
 
 $ScriptString = @'
 $Partition = Get-Partition -DriveLetter C
@@ -636,6 +642,7 @@ Start-Process $($VSCodeSetup.FullName) -ArgumentList $installerArguments -Wait
         if ($Result.Value.Message -like "*error*") 
         {
             throw $($Error[0])
+            break
         }
         else
         {
@@ -644,7 +651,7 @@ Start-Process $($VSCodeSetup.FullName) -ArgumentList $installerArguments -Wait
             Write-Host "StartTime $($StartTime)" -ForegroundColor White
             Write-Host "EndTime $($EndTime)" -ForegroundColor White
             Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
-Write-Host ""
+            Write-Host ""
         }
     }
     catch
@@ -664,6 +671,7 @@ Write-Host ""
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
     Write-Host "$($VirtualMachineName) - Configuring Hyper-V to host the Domain Controller/Certificate Services & ADFS" -ForegroundColor Green
+    Write-Host ""
 
 $ScriptString = @'
 
@@ -836,6 +844,7 @@ Foreach ($Server in $Servers)
         if ($Result.Value.Message -like "*error*") 
         {
             throw $($Error[0])
+            break
         }
         else
         {
@@ -844,7 +853,7 @@ Foreach ($Server in $Servers)
             Write-Host "StartTime $($StartTime)" -ForegroundColor White
             Write-Host "EndTime $($EndTime)" -ForegroundColor White
             Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
-Write-Host ""
+            Write-Host ""
         }
     }
     catch
@@ -864,6 +873,7 @@ Write-Host ""
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
     Write-Host "$($VirtualMachineName) - Installing Active Directory and Certificate Services" -ForegroundColor Green
+    Write-Host ""
 
 $ScriptString = @'
 #Configure AD CS
@@ -1025,6 +1035,7 @@ Invoke-Command -VMName 'ADFS-01' -Credential $LocalCredential -ScriptBlock {Add-
         if ($Result.Value.Message -like "*error*") 
         {
             throw $($Error[0])
+            break
         }
         else
         {
@@ -1033,7 +1044,7 @@ Invoke-Command -VMName 'ADFS-01' -Credential $LocalCredential -ScriptBlock {Add-
             Write-Host "StartTime $($StartTime)" -ForegroundColor White
             Write-Host "EndTime $($EndTime)" -ForegroundColor White
             Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
-Write-Host ""
+            Write-Host ""
         }
     }
     catch
@@ -1051,7 +1062,8 @@ Write-Host ""
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
-   Write-Host "$($VirtualMachineName) - Generating the Azure Stack Deployment Certificates." -ForegroundColor Green
+    Write-Host "$($VirtualMachineName) - Generating the Azure Stack Deployment Certificates." -ForegroundColor Green
+    Write-Host ""
 
 $ScriptString = @'
 $VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
@@ -1139,6 +1151,7 @@ ConvertTo-AzsPFX -Path $CERPath -pfxPassword $PFXPassword -ExportPath $PFXExport
         if ($Result.Value.Message -like "*error*") 
         {
             throw $($Error[0])
+            break
         }
         else
         {
@@ -1147,7 +1160,7 @@ ConvertTo-AzsPFX -Path $CERPath -pfxPassword $PFXPassword -ExportPath $PFXExport
             Write-Host "StartTime $($StartTime)" -ForegroundColor White
             Write-Host "EndTime $($EndTime)" -ForegroundColor White
             Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
-Write-Host ""
+            Write-Host ""
         }
     }
     catch
@@ -1166,6 +1179,7 @@ Write-Host ""
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
     Write-Host "$($VirtualMachineName) - Copying the Azure Stack Deployment Certificates." -ForegroundColor Green
+    Write-Host ""
 
 $ScriptString = @'
 $VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
@@ -1197,6 +1211,7 @@ Remove-PSSession $ADSession
         if ($Result.Value.Message -like "*error*") 
         {
             throw $($Error[0])
+            break
         }
         else
         {
@@ -1205,7 +1220,7 @@ Remove-PSSession $ADSession
             Write-Host "StartTime $($StartTime)" -ForegroundColor White
             Write-Host "EndTime $($EndTime)" -ForegroundColor White
             Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
-Write-Host ""
+            Write-Host ""
         }
     }
     catch
@@ -1530,6 +1545,7 @@ Add-Content -Path `$InstallScript.FullName -Value `$InstallAzureStackPOCScript -
         if ($Result.Value.Message -like "*error*") 
         {
             throw $($Error[0])
+            break
         }
         else
         {
@@ -1538,7 +1554,7 @@ Add-Content -Path `$InstallScript.FullName -Value `$InstallAzureStackPOCScript -
             Write-Host "StartTime $($StartTime)" -ForegroundColor White
             Write-Host "EndTime $($EndTime)" -ForegroundColor White
             Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
-Write-Host ""
+            Write-Host ""
         }
     }
     catch
@@ -1557,6 +1573,7 @@ Write-Host ""
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
     Write-Host "$($VirtualMachineName) - Removing AD & ADFS Virtual Machines." -ForegroundColor Green
+    Write-Host ""
 
 $ScriptString = @'
 Get-vm | Stop-VM -Force
@@ -1580,6 +1597,7 @@ Get-NetAdapter | Where-Object {$_.Name -like "*ADSwitch*"} | Disable-NetAdapter 
         if ($Result.Value.Message -like "*error*") 
         {
             throw $($Error[0])
+            break
         }
         else
         {
@@ -1588,7 +1606,7 @@ Get-NetAdapter | Where-Object {$_.Name -like "*ADSwitch*"} | Disable-NetAdapter 
             Write-Host "StartTime $($StartTime)" -ForegroundColor White
             Write-Host "EndTime $($EndTime)" -ForegroundColor White
             Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
-Write-Host ""
+W           Write-Host ""
         }
     }
     catch
@@ -1662,6 +1680,7 @@ Register-ScheduledTask @registrationParams -User "`$env:ComputerName\Administrat
         if ($Result.Value.Message -like "*error*") 
         {
             throw $($Error[0])
+            break
         }
         else
         {
@@ -1670,7 +1689,7 @@ Register-ScheduledTask @registrationParams -User "`$env:ComputerName\Administrat
             Write-Host "StartTime $($StartTime)" -ForegroundColor White
             Write-Host "EndTime $($EndTime)" -ForegroundColor White
             Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
-Write-Host ""
+            Write-Host ""
         }
     }
     catch
@@ -1703,6 +1722,7 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
         if ($Result.Value.Message -like "*error*") 
         {
             throw $($Error[0])
+            break
         }
         else
         {
@@ -1711,7 +1731,7 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
             Write-Host "StartTime $($StartTime)" -ForegroundColor White
             Write-Host "EndTime $($EndTime)" -ForegroundColor White
             Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
-Write-Host ""
+            Write-Host ""
         }
     }
     catch
