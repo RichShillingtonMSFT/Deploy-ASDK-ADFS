@@ -261,7 +261,7 @@ Install-WindowsFeature -Name Hyper-V -IncludeManagementTools
 #endregion
 
 #region Copy Setup Files from Azure Storage
-Write-host "I am now going to Downloading Setup files from Azure Storage." -ForegroundColor Yellow
+Write-host "I am now going to download setup files from Azure Storage." -ForegroundColor Yellow
 Write-host "This takes about 5 minutes. Please wait..." -ForegroundColor Yellow
 Write-Host ""
 
@@ -873,8 +873,7 @@ Foreach ($Server in $Servers)
 #region Install Active Directory and Configure Certificate Services
 $NowTime = Get-Date -DisplayHint Time
 Write-Host "Now I will install Active Directory & Certificate Services."
-Write-Host "I will install create the Azure Stack Deployment Certificate Template, and join ADFS to the Domain."
-Write-Host "I will install create the Azure Stack Deployment Certificate Template, and join ADFS to the Domain."
+Write-Host "I will also create the Azure Stack Deployment Certificate Template."
 Write-Host $('It has only been like {0:mm} minutes since we started this script. Calm Down!.. It is getting there.' -f ($NowTime-$ScriptStartTime)) -ForegroundColor Yellow
 Write-Host ""
 
@@ -902,7 +901,7 @@ Install-ADDSForest -DomainName "contoso.local" `
     -DomainNetbiosName Contoso -Force
 }
 
-Start-Sleep -Seconds 600
+Start-Sleep -Seconds 300
 
 Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {Install-WindowsFeature ADCS-Cert-Authority} -Verbose
 Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {Install-WindowsFeature RSAT-ADCS-Mgmt} -Verbose
@@ -1018,6 +1017,69 @@ Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
 Invoke-Command -Session $ADSession -ScriptBlock {Restart-Computer -Force -Wait 0} -Verbose -ErrorAction 'Stop'
 
 Start-Sleep -Seconds 120
+
+Stop-Transcript
+'@
+
+    $ScriptString = $ScriptString.Replace('[AdminPassword]',"$AdminPassword")
+
+    try 
+    {
+        $StartTime = Get-Date -DisplayHint Time
+
+        $Job = Invoke-AzVMRunCommand -VMName $VirtualMachineName `
+            -ResourceGroupName $LabResourceGroup.ResourceGroupName `
+            -CommandId 'RunPowerShellScript' `
+            -ScriptString $ScriptString -AsJob
+
+        $Result = Get-Job -Id $Job.Id | Wait-Job | Receive-Job
+
+        $EndTime = Get-Date -DisplayHint Time
+
+        if ($Result.Value.Message -like "*error*") 
+        {
+            throw $($Error[0])
+            break
+        }
+        else
+        {
+            Write-Host "PowerShell Job $($Result.Status)" -ForegroundColor Green
+            Write-Host "$($Result.Value.Message)" -ForegroundColor Green
+            Write-Host "StartTime $($StartTime)" -ForegroundColor White
+            Write-Host "EndTime $($EndTime)" -ForegroundColor White
+            Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
+            Write-Host ""
+        }
+    }
+    catch
+    {
+        Write-Host "Job Failed: `n $($Result.Value.Message)" -ForegroundColor Red
+        Write-Host "Error while running the PowerShell Job" -ForegroundColor Red
+        break
+    }
+}
+#endregion
+
+#region Make the Azure Stack Certificate Template available and join ADFS to the Domain
+Write-Host "Now I am going to make the Azure Stack Certificate Template available and join ADFS to the Domain."
+Write-Host "" -ForegroundColor Yellow
+Write-Host ""
+
+foreach ($VirtualMachineName in $DeployedVirtualMachines)
+{
+    Write-Host "$($VirtualMachineName) - Making Azure Stack Certificate Template available and joining ADFS to the Domain" -ForegroundColor Green
+    Write-Host ""
+
+$ScriptString = @'
+#Configure AD CS
+Start-Transcript -Path "C:\logs\CertTemplateDomainJoin.txt" -NoClobber -Force
+$VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
+
+$Username = '.\Administrator'
+$LocalCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
+
+$Username = 'Contoso\Administrator'
+$DomainCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
 
 $ADSession = New-PSSession -ComputerName 'AD-01' -Credential $DomainCredential
 
