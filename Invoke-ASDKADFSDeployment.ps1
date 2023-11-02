@@ -189,7 +189,7 @@ $DeployedVirtualMachines = $Deployment.Outputs.Values.value
 Write-Host "Template Deployment Complete" -ForegroundColor Green
 Write-Host "Start Time $($StartTime)" -ForegroundColor White
 Write-Host "End Time $($EndTime)" -ForegroundColor White
-Write-Host "Runtime $($($StartTime) - $($EndTime))" -ForegroundColor Yellow
+Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor Yellow
 #endregion
 
 #region Configure Virtual Machine Disks
@@ -239,7 +239,7 @@ Install-WindowsFeature -Name Hyper-V -IncludeManagementTools
             Write-Host "$($Result.Value.Message)" -ForegroundColor Green
             Write-Host "StartTime $($StartTime)" -ForegroundColor White
             Write-Host "EndTime $($EndTime)" -ForegroundColor White
-            Write-Host "Runtime $($($StartTime) - $($EndTime))" -ForegroundColor Yellow
+            Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor Yellow
             
         }
     }
@@ -298,7 +298,7 @@ azcopy copy 'https://asdkdeploymentsa.blob.core.usgovcloudapi.net/software' $($I
             Write-Host "$($Result.Value.Message)" -ForegroundColor Green
             Write-Host "StartTime $($StartTime)" -ForegroundColor White
             Write-Host "EndTime $($EndTime)" -ForegroundColor White
-            Write-Host "Runtime $($($StartTime) - $($EndTime))" -ForegroundColor Yellow
+            Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor Yellow
             
         }
     }
@@ -338,7 +338,7 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
             Write-Host "$($Result.Value.Message)" -ForegroundColor Green
             Write-Host "StartTime $($StartTime)" -ForegroundColor White
             Write-Host "EndTime $($EndTime)" -ForegroundColor White
-            Write-Host "Runtime $($($StartTime) - $($EndTime))" -ForegroundColor Yellow
+            Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor Yellow
             
         }
     }
@@ -518,7 +518,7 @@ bcdboot `$Prepare_Vhdx_DriveLetter':\Windows'
             Write-Host "$($Result.Value.Message)" -ForegroundColor Green
             Write-Host "StartTime $($StartTime)" -ForegroundColor White
             Write-Host "EndTime $($EndTime)" -ForegroundColor White
-            Write-Host "Runtime $($($StartTime) - $($EndTime))" -ForegroundColor Yellow
+            Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor Yellow
             
         }
     }
@@ -558,7 +558,7 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
             Write-Host "$($Result.Value.Message)" -ForegroundColor Green
             Write-Host "StartTime $($StartTime)" -ForegroundColor White
             Write-Host "EndTime $($EndTime)" -ForegroundColor White
-            Write-Host "Runtime $($($StartTime) - $($EndTime))" -ForegroundColor Yellow
+            Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor Yellow
             
         }
     }
@@ -627,7 +627,7 @@ Start-Process $($VSCodeSetup.FullName) -ArgumentList $installerArguments -Wait
             Write-Host "$($Result.Value.Message)" -ForegroundColor Green
             Write-Host "StartTime $($StartTime)" -ForegroundColor White
             Write-Host "EndTime $($EndTime)" -ForegroundColor White
-            Write-Host "Runtime $($($StartTime) - $($EndTime))" -ForegroundColor Yellow
+            Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor Yellow
         }
     }
     catch
@@ -825,7 +825,7 @@ Foreach ($Server in $Servers)
             Write-Host "$($Result.Value.Message)" -ForegroundColor Green
             Write-Host "StartTime $($StartTime)" -ForegroundColor White
             Write-Host "EndTime $($EndTime)" -ForegroundColor White
-            Write-Host "Runtime $($($StartTime) - $($EndTime))" -ForegroundColor Yellow
+            Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor Yellow
         }
     }
     catch
@@ -1009,7 +1009,7 @@ Invoke-Command -VMName 'ADFS-01' -Credential $LocalCredential -ScriptBlock {Add-
             Write-Host "$($Result.Value.Message)" -ForegroundColor Green
             Write-Host "StartTime $($StartTime)" -ForegroundColor White
             Write-Host "EndTime $($EndTime)" -ForegroundColor White
-            Write-Host "Runtime $($($StartTime) - $($EndTime))" -ForegroundColor Yellow
+            Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor Yellow
         }
     }
     catch
@@ -1121,7 +1121,7 @@ ConvertTo-AzsPFX -Path $CERPath -pfxPassword $PFXPassword -ExportPath $PFXExport
             Write-Host "$($Result.Value.Message)" -ForegroundColor Green
             Write-Host "StartTime $($StartTime)" -ForegroundColor White
             Write-Host "EndTime $($EndTime)" -ForegroundColor White
-            Write-Host "Runtime $($($StartTime) - $($EndTime))" -ForegroundColor Yellow
+            Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor Yellow
         }
     }
     catch
@@ -1176,7 +1176,7 @@ Remove-PSSession $ADSession
             Write-Host "$($Result.Value.Message)" -ForegroundColor Green
             Write-Host "StartTime $($StartTime)" -ForegroundColor White
             Write-Host "EndTime $($EndTime)" -ForegroundColor White
-            Write-Host "Runtime $($($StartTime) - $($EndTime))" -ForegroundColor Yellow
+            Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor Yellow
         }
     }
     catch
@@ -1507,7 +1507,7 @@ Add-Content -Path `$InstallScript.FullName -Value `$InstallAzureStackPOCScript -
             Write-Host "$($Result.Value.Message)" -ForegroundColor Green
             Write-Host "StartTime $($StartTime)" -ForegroundColor White
             Write-Host "EndTime $($EndTime)" -ForegroundColor White
-            Write-Host "Runtime $($($StartTime) - $($EndTime))" -ForegroundColor Yellow
+            Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor Yellow
         }
     }
     catch
@@ -1554,7 +1554,7 @@ Get-NetAdapter | Where-Object {$_.Name -like "*ADSwitch*"} | Disable-NetAdapter 
             Write-Host "$($Result.Value.Message)" -ForegroundColor Green
             Write-Host "StartTime $($StartTime)" -ForegroundColor White
             Write-Host "EndTime $($EndTime)" -ForegroundColor White
-            Write-Host "Runtime $($($StartTime) - $($EndTime))" -ForegroundColor Yellow
+            Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor Yellow
         }
     }
     catch
@@ -1633,7 +1633,7 @@ Register-ScheduledTask @registrationParams -User "`$env:ComputerName\Administrat
             Write-Host "$($Result.Value.Message)" -ForegroundColor Green
             Write-Host "StartTime $($StartTime)" -ForegroundColor White
             Write-Host "EndTime $($EndTime)" -ForegroundColor White
-            Write-Host "Runtime $($($StartTime) - $($EndTime))" -ForegroundColor Yellow
+            Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor Yellow
         }
     }
     catch
@@ -1672,7 +1672,7 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
             Write-Host "$($Result.Value.Message)" -ForegroundColor Green
             Write-Host "StartTime $($StartTime)" -ForegroundColor White
             Write-Host "EndTime $($EndTime)" -ForegroundColor White
-            Write-Host "Runtime $($($StartTime) - $($EndTime))" -ForegroundColor Yellow
+            Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor Yellow
         }
     }
     catch
@@ -1687,7 +1687,7 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
 $ScriptEndTime = Get-Date -DisplayHint Time
 
 Write-Host "Deployment Jobs are complete." -ForegroundColor Green
-Write-Host "Total Runtime $($($ScriptStartTime) - $($ScriptEndTime))" -ForegroundColor Yellow
+Write-Host $('Total Duration: {0:mm} min {0:ss} sec' -f ($ScriptEndTime-$ScriptStartTime)) -ForegroundColor Yellow
 Write-Host ''
 Write-Host "Depending on the Virtual Machine Sku, it can take 12-18 Hours to complete the ASDK Install." -ForegroundColor Yellow
 Write-Host "You can connect to the ASDK Virtual Machines using RDP to monitor the progress." -ForegroundColor Green
