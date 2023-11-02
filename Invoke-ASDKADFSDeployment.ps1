@@ -1112,6 +1112,7 @@ ConvertTo-AzsPFX -Path $CERPath -pfxPassword $PFXPassword -ExportPath $PFXExport
 #endregion
 
 #region Copy Deployment Certificates
+Write-Host "Only 5 more steps. It is sooooo close now!" -ForegroundColor Yellow
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
     Write-Host "$($VirtualMachineName) - Copying the Azure Stack Deployment Certificates." -ForegroundColor Green
@@ -1493,6 +1494,7 @@ Add-Content -Path `$InstallScript.FullName -Value `$InstallAzureStackPOCScript -
 #endregion
 
 #region Remove Hyper-V Virtual Machines
+Write-Host "Only 3 more steps. Only a few more to go!" -ForegroundColor Yellow
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
     Write-Host "$($VirtualMachineName) - Removing AD & ADFS Virtual Machines." -ForegroundColor Green
@@ -1537,6 +1539,7 @@ Get-NetAdapter | Where-Object {$_.Name -like "*ADSwitch*"} | Disable-NetAdapter 
 #endregion
 
 #region Setup ASDK Install Job
+Write-Host "Only one more step after this! hang in there buddy..." -ForegroundColor Yellow
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
     Write-Host "$($VirtualMachineName) - Starting ASDK Deployment." -ForegroundColor Green
