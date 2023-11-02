@@ -670,7 +670,7 @@ Start-Process $($VSCodeSetup.FullName) -ArgumentList $installerArguments -Wait
 
 #region Create AD,CA & ADFS Virtual Machines
 Write-Host "Now I must Configure the Hyper-V host and setup the Domain Controller, Certificate Services & ADFS" -ForegroundColor Yellow
-Write-host "This should take less than 20 minutes. I am doing lots of work for you. Settle Down..." -ForegroundColor Yellow
+Write-host "This should take about 16-20 minutes. I am doing lots of work for you. Settle Down..." -ForegroundColor Yellow
 Write-Host ""
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
@@ -871,10 +871,9 @@ Foreach ($Server in $Servers)
 #endregion
 
 #region Install Active Directory and Configure Certificate Services
-$NowTime = Get-Date -DisplayHint Time
 Write-Host "Now I will install Active Directory & Certificate Services." -ForegroundColor Yellow
 Write-Host "I will also create the Azure Stack Deployment Certificate Template." -ForegroundColor Yellow
-Write-Host $('It has only been like {0:mm} minutes since we started this script. Calm Down!.. It is getting there.' -f ($NowTime-$ScriptStartTime)) -ForegroundColor Yellow
+Write-host "This should take about  minutes." -ForegroundColor Yellow
 Write-Host ""
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
@@ -1014,10 +1013,6 @@ Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
     Expand-Archive -Path "C:\Scripts.zip" -DestinationPath "C:\Scripts" -Force
 }
 
-Invoke-Command -Session $ADSession -ScriptBlock {Restart-Computer -Force -Wait 0} -Verbose -ErrorAction 'Stop'
-
-Start-Sleep -Seconds 120
-
 Stop-Transcript
 '@
 
@@ -1061,7 +1056,9 @@ Stop-Transcript
 #endregion
 Pause
 #region Make the Azure Stack Certificate Template available and join ADFS to the Domain
+$NowTime = Get-Date -DisplayHint Time
 Write-Host "Now I am going to make the Azure Stack Certificate Template available and join ADFS to the Domain." -ForegroundColor Yellow
+Write-Host $('It has only been like {0:mm} minutes since we started this script. Calm Down!.. It is getting there.' -f ($NowTime-$ScriptStartTime)) -ForegroundColor Yellow
 Write-Host ""
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
@@ -1079,6 +1076,11 @@ $LocalCredential = New-Object System.Management.Automation.PSCredential($Usernam
 
 $Username = 'Contoso\Administrator'
 $DomainCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
+
+Restart-VM -Name 'AD-01' -Force -Wait
+Start-Sleep -Seconds 30
+Restart-VM -Name 'ADFS-01' -Force -Wait
+Start-Sleep -Seconds 30
 
 $ADSession = New-PSSession -ComputerName '10.100.100.10' -Credential $DomainCredential
 
@@ -1128,7 +1130,7 @@ Stop-Transcript
     }
 }
 #endregion
-
+Pause
 #region Generate Deployment Certificates
 Write-Host "Now we are getting close. Just a few more things to take care of..." -ForegroundColor Yellow
 Write-Host ""
@@ -1933,7 +1935,7 @@ foreach ($DeployedVirtualMachine in $DeployedVirtualMachines)
     $DataTable.Rows.Add($NewRow)
 }
 
-$CSVFileName = 'DeployedVMs' + $(Get-Date -f yyyy-MM-dd) + '.csv'
+$CSVFileName = $($LabResourceGroup.ResourceGroupName) + '-DeployedVMs-' + $(Get-Date -f yyyy-MM-dd) + '.csv'
 $DataTable | Export-Csv "$ENV:UserProfile\Documents\$CSVFileName" -NoTypeInformation
 #endregion
 
