@@ -244,6 +244,7 @@ Install-WindowsFeature -Name Hyper-V -IncludeManagementTools
     {
         Write-Host "Job Failed: `n $($Result.Value.Message)" -ForegroundColor Red
         Write-Host "Error while running the PowerShell Job" -ForegroundColor Red
+        break
     }
 }
 #endregion
@@ -301,6 +302,7 @@ azcopy copy 'https://asdkdeploymentsa.blob.core.usgovcloudapi.net/software' $($I
     {
         Write-Host "Job Failed: `n $($Result.Value.Message)" -ForegroundColor Red
         Write-Host "Error while running the PowerShell Job" -ForegroundColor Red
+        break
     }
 }
 #endregion
@@ -339,6 +341,7 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
     {
         Write-Host "Job Failed: `n $($Result.Value.Message)" -ForegroundColor Red
         Write-Host "Error while running the PowerShell Job" -ForegroundColor Red
+        break
     }
 }
 #endregion
@@ -517,6 +520,7 @@ bcdboot `$Prepare_Vhdx_DriveLetter':\Windows'
     {
         Write-Host "Job Failed: `n $($Result.Value.Message)" -ForegroundColor Red
         Write-Host "Error while running the PowerShell Job" -ForegroundColor Red
+        break
     }
 }
 #endregion
@@ -555,6 +559,7 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
     {
         Write-Host "Job Failed: `n $($Result.Value.Message)" -ForegroundColor Red
         Write-Host "Error while running the PowerShell Job" -ForegroundColor Red
+        break
     }
 }
 #endregion
@@ -622,6 +627,7 @@ Start-Process $($VSCodeSetup.FullName) -ArgumentList $installerArguments -Wait
     {
         Write-Host "Job Failed: `n $($Result.Value.Message)" -ForegroundColor Red
         Write-Host "Error while running the PowerShell Job" -ForegroundColor Red
+        break
     }
 }
 #endregion
@@ -818,6 +824,7 @@ Foreach ($Server in $Servers)
     {
         Write-Host "Job Failed: `n $($Result.Value.Message)" -ForegroundColor Red
         Write-Host "Error while running the PowerShell Job" -ForegroundColor Red
+        break
     }
 }
 #endregion
@@ -1000,6 +1007,7 @@ Invoke-Command -VMName 'ADFS-01' -Credential $LocalCredential -ScriptBlock {Add-
     {
         Write-Host "Job Failed: `n $($Result.Value.Message)" -ForegroundColor Red
         Write-Host "Error while running the PowerShell Job" -ForegroundColor Red
+        break
     }
 }
 #endregion
@@ -1110,6 +1118,7 @@ ConvertTo-AzsPFX -Path $CERPath -pfxPassword $PFXPassword -ExportPath $PFXExport
     {
         Write-Host "Job Failed: `n $($Result.Value.Message)" -ForegroundColor Red
         Write-Host "Error while running the PowerShell Job" -ForegroundColor Red
+        break
     }
 }
 #endregion
@@ -1163,6 +1172,7 @@ Remove-PSSession $ADSession
     {
         Write-Host "Job Failed: `n $($Result.Value.Message)" -ForegroundColor Red
         Write-Host "Error while running the PowerShell Job" -ForegroundColor Red
+        break
     }
 }
 #endregion
@@ -1492,6 +1502,7 @@ Add-Content -Path `$InstallScript.FullName -Value `$InstallAzureStackPOCScript -
     {
         Write-Host "Job Failed: `n $($Result.Value.Message)" -ForegroundColor Red
         Write-Host "Error while running the PowerShell Job" -ForegroundColor Red
+        break
     }
 }
 #endregion
@@ -1537,6 +1548,7 @@ Get-NetAdapter | Where-Object {$_.Name -like "*ADSwitch*"} | Disable-NetAdapter 
     {
         Write-Host "Job Failed: `n $($Result.Value.Message)" -ForegroundColor Red
         Write-Host "Error while running the PowerShell Job" -ForegroundColor Red
+        break
     }
 }
 #endregion
@@ -1614,6 +1626,7 @@ Register-ScheduledTask @registrationParams -User "`$env:ComputerName\Administrat
     {
         Write-Host "Job Failed: `n $($Result.Value.Message)" -ForegroundColor Red
         Write-Host "Error while running the PowerShell Job" -ForegroundColor Red
+        break
     }
 }
 #endregion
@@ -1652,6 +1665,7 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
     {
         Write-Host "Job Failed: `n $($Result.Value.Message)" -ForegroundColor Red
         Write-Host "Error while running the PowerShell Job" -ForegroundColor Red
+        break
     }
 }
 #endregion
