@@ -375,6 +375,11 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
     Write-Host ""
 
 $ScriptString = @"
+If ((Get-Service -Name 'Hyper-V Virtual Machine Management').Status -ne 'Running')
+{
+    Get-Service -Name 'Hyper-V Virtual Machine Management' | Start-Service -ErrorAction Stop
+}
+
 Import-Module Hyper-V
 
 Rename-Item -Path C:\SetupFiles\CloudBuilder.vhdx -NewName ASDK.vhdx -Force
