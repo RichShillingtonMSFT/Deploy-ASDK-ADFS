@@ -196,6 +196,7 @@ Write-Host ""
 #region Configure Virtual Machine Disks
 Write-host "I am now going to configure the Virtual Machine Disks & Install Hyper-V." -ForegroundColor Yellow
 Write-host "This takes about 5 minutes. Please wait..." -ForegroundColor Yellow
+Write-Host ""
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
@@ -257,6 +258,7 @@ Write-Host ""
 #region Copy Setup Files from Azure Storage
 Write-host "I am now going to Downloading Setup files from Azure Storage." -ForegroundColor Yellow
 Write-host "This takes about 5 minutes. Please wait..." -ForegroundColor Yellow
+Write-Host ""
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
@@ -317,6 +319,7 @@ Write-Host ""
 #region Restart Virtual Machines
 Write-host "Now I need to restart the Virtual Machines." -ForegroundColor Yellow
 Write-host "This can take up to 5 minutes. Please wait..." -ForegroundColor Yellow
+Write-Host ""
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
@@ -358,6 +361,7 @@ Write-Host ""
 #region Prepare Virtual Machine Boot VHD & Configure OOBe Setup
 Write-Host "Now it is time to prepare the Virtual Machine VHDs and Configure the VM to boot from a VHD." -ForegroundColor Yellow
 Write-Host "Depending on Disk Speed, this can take a few minutes. Just relax...." -ForegroundColor Yellow
+Write-Host ""
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
@@ -539,6 +543,7 @@ Write-Host ""
 #region Restart Virtual Machines
 Write-host "Now I need to restart the Virtual Machines." -ForegroundColor Yellow
 Write-host "This can take up to 5 minutes. Please wait..." -ForegroundColor Yellow
+Write-Host ""
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
@@ -579,11 +584,13 @@ Write-Host ""
 
 Write-host "Now we need to wait a few minutes for the Virtual Machines to complete setup..." -ForegroundColor Yellow
 Write-host "This takes about 7-10 minutes. Please wait..." -ForegroundColor Yellow
+Write-Host ""
 Start-Sleep -Seconds 500
 
 #region resize OS Disk & Install Software
 Write-Host "Now I will expand the OS Disk and Install some additional Software." -ForegroundColor Yellow
 Write-host "This takes about 5-10 minutes. Please wait..." -ForegroundColor Yellow
+Write-Host ""
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
@@ -649,6 +656,7 @@ Write-Host ""
 #region Create AD,CA & ADFS Virtual Machines
 Write-Host "Now I must Configure the Hyper-V host and setup the Domain Controller, Certificate Services & ADFS" -ForegroundColor Yellow
 Write-host "This takes about 35 minutes. I am doing lots of work for you. Settle Down..." -ForegroundColor Yellow
+Write-Host ""
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
@@ -848,6 +856,7 @@ Write-Host ""
 #region Install Active Directory and Configure Certificate Services
 $NowTime = Get-Date -DisplayHint Time
 Write-Host $('It has only been like {0:mm} minutes. Calm Down!.. It is getting there.' -f ($NowTime-$SciptStartTime)) -ForegroundColor Yellow
+Write-Host ""
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
@@ -1035,6 +1044,7 @@ Write-Host ""
 
 #region Generate Deployment Certificates
 Write-Host "Now we are getting close. Just a few more things to take care of..." -ForegroundColor Yellow
+Write-Host ""
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
@@ -1148,6 +1158,8 @@ Write-Host ""
 
 #region Copy Deployment Certificates
 Write-Host "Only 5 more steps. It is sooooo close now!" -ForegroundColor Yellow
+Write-Host ""
+
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
     Write-Host "$($VirtualMachineName) - Copying the Azure Stack Deployment Certificates." -ForegroundColor Green
@@ -1206,6 +1218,7 @@ Write-Host ""
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
     Write-Host "$($VirtualMachineName) - Creating the Azure Stack Deployment Script." -ForegroundColor Green
+    Write-Host ""
 
 $ScriptString = @"
 `$InstallScript = New-Item -Path C:\CloudDeployment\Setup -Name InstallAzureStackPOC.ps1 -ItemType File -Force
@@ -1536,6 +1549,8 @@ Write-Host ""
 
 #region Remove Hyper-V Virtual Machines
 Write-Host "Only 3 more steps. Only a few more to go!" -ForegroundColor Yellow
+Write-Host ""
+
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
     Write-Host "$($VirtualMachineName) - Removing AD & ADFS Virtual Machines." -ForegroundColor Green
@@ -1584,6 +1599,8 @@ Write-Host ""
 
 #region Setup ASDK Install Job
 Write-Host "Only one more step after this! hang in there buddy..." -ForegroundColor Yellow
+Write-Host ""
+
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
     Write-Host "$($VirtualMachineName) - Starting ASDK Deployment." -ForegroundColor Green
@@ -1665,6 +1682,7 @@ Write-Host ""
 #region Restart Server to begin ASDK Install
 Write-host "Now I need to restart the Virtual Machines." -ForegroundColor Yellow
 Write-host "This can take up to 5 minutes. Please wait..." -ForegroundColor Yellow
+Write-Host ""
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
