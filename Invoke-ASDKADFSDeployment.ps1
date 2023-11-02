@@ -961,6 +961,8 @@ Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
     Expand-Archive -Path "C:\Scripts.zip" -DestinationPath "C:\Scripts" -Force
 }
 
+Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {Restart-Computer -Force -Wait 0}
+
 Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {Add-CATemplate -Name "AzureStack" -Force}
 
 # Configure ADFS
