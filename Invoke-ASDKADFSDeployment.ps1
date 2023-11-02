@@ -602,7 +602,7 @@ Start-Sleep -Seconds 380
 
 #region resize OS Disk & Install Software
 Write-Host "Now I will expand the OS Disk and Install some additional Software." -ForegroundColor Yellow
-Write-host "This takes about 5-10 minutes. Please wait..." -ForegroundColor Yellow
+Write-host "This should take less than 5 minutes. Please wait..." -ForegroundColor Yellow
 Write-Host ""
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
