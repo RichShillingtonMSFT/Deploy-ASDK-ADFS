@@ -1065,7 +1065,7 @@ Stop-Transcript
     }
 }
 #endregion
-Pause
+
 #region Make the Azure Stack Certificate Template available and join ADFS to the Domain
 $NowTime = Get-Date -DisplayHint Time
 Write-Host "Now I am going to make the Azure Stack Certificate Template available and join ADFS to the Domain." -ForegroundColor Yellow
@@ -1144,7 +1144,7 @@ Stop-Transcript
     }
 }
 #endregion
-Pause
+
 #region Generate Deployment Certificates
 Write-Host "Now we are getting close. Just a few more things to take care of..." -ForegroundColor Yellow
 Write-Host ""
