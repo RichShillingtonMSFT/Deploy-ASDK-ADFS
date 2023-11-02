@@ -583,9 +583,9 @@ Write-Host ""
 #endregion
 
 Write-host "Now we need to wait a few minutes for the Virtual Machines to complete setup..." -ForegroundColor Yellow
-Write-host "This takes about 7-10 minutes. Please wait..." -ForegroundColor Yellow
+Write-host "This takes about 7 minutes. Please wait..." -ForegroundColor Yellow
 Write-Host ""
-Start-Sleep -Seconds 500
+Start-Sleep -Seconds 380
 
 #region resize OS Disk & Install Software
 Write-Host "Now I will expand the OS Disk and Install some additional Software." -ForegroundColor Yellow
