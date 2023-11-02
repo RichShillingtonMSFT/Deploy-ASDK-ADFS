@@ -264,9 +264,6 @@
             }
           ]
         },
-        "additionalCapabilities": {
-            "ultraSSDEnabled": true
-        },
         "licenseType": "Windows_Server",
         "diagnosticsProfile": {
           "bootDiagnostics": {

@@ -88,7 +88,9 @@ Param
 
 #region Functions & Variables
 $WarningPreference = 'SilentlyContinue'
+
 $ScriptStartTime = Get-Date -DisplayHint Time
+
 $ASDKLinkUri = "https://asdkdeploymentsa.blob.core.usgovcloudapi.net/asdks/$ASDKVersion/CloudBuilder.vhdx"
 
 if (!($SourceAddressForRDP))
@@ -1323,7 +1325,7 @@ Remove-PSSession $ADSession
     }
 }
 #endregion
-
+Pause
 #region Create Azure Stack Deployment Script
 Write-Host "I need to replace the Azure Stack Deployment Script with one I made just for you!" -ForegroundColor Yellow
 Write-Host "Do you feel special now?" -ForegroundColor Yellow
@@ -1661,7 +1663,7 @@ Add-Content -Path `$InstallScript.FullName -Value `$InstallAzureStackPOCScript -
     }
 }
 #endregion
-
+Pause
 #region Remove Hyper-V Virtual Machines
 Write-Host "Only 4 more steps. Only a few more to go!" -ForegroundColor Yellow
 Write-Host ""
@@ -1713,7 +1715,7 @@ W           Write-Host ""
     }
 }
 #endregion
-
+Pause
 #region Setup ASDK Install Job
 Write-Host "Only 2 more step after this! hang in there buddy..." -ForegroundColor Yellow
 Write-Host ""
@@ -1796,7 +1798,7 @@ Register-ScheduledTask @registrationParams -User "`$env:ComputerName\Administrat
     }
 }
 #endregion
-
+Pause
 #region Create Script to Finalize the Install
 Write-Host "Just need to drop a script on the C Drive for you to use later." -ForegroundColor Yellow
 Write-Host ""
@@ -1895,7 +1897,7 @@ Add-Content -Path `$PostInstallScript.FullName -Value `$FinalizeAzureStackPOCScr
     }
 }
 #endregion
-
+Pause
 #region Restart Server to begin ASDK Install
 Write-host "Now I need to restart the Virtual Machines." -ForegroundColor Yellow
 Write-host "This can take up to 5 minutes. Please wait..." -ForegroundColor Yellow
@@ -1937,7 +1939,7 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
     }
 }
 #endregion
-
+Pause
 #region Export VM Information to Users Documents folder
 $DataTable = New-Object System.Data.DataTable
 $DataTable.Columns.Add("VMName","string") | Out-Null
