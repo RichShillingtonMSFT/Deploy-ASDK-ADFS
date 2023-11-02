@@ -148,6 +148,7 @@ $Location = $Locations | Out-GridView -Title "Please Select the Azure Resource D
 #endregion
 
 Write-Host "Connected to Azure" -ForegroundColor Green
+Write-Host ""
 
 #region Create Resource Group
 $LabResourceGroup = Get-AzResourceGroup -Name $LabResourceGroupName -Location $Location.Location -ErrorAction SilentlyContinue
@@ -156,6 +157,7 @@ If (!($LabResourceGroup))
     $LabResourceGroup = New-AzResourceGroup -Name $LabResourceGroupName -Location $Location.Location
 }
 Write-Host "Resource Group $LabResourceGroupName is ready" -ForegroundColor Green
+Write-Host ""
 #endregion
 
 #region Template Deployment
@@ -178,6 +180,7 @@ $TemplateParams = @{
 }
 
 Write-Host "Starting Template Deployment" -ForegroundColor Green
+Write-Host ""
 $StartTime = Get-Date -DisplayHint Time
 $Deployment = New-AzResourceGroupDeployment -Name ASDKDeployment `
     -ResourceGroupName $LabResourceGroup.ResourceGroupName `
