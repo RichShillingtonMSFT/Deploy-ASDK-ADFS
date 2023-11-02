@@ -823,6 +823,8 @@ Foreach ($Server in $Servers)
 #endregion
 
 #region Install Active Directory and Configure Certificate Services
+Write-Host "It has only been like 15 minutes. Calm Down!.. It is getting there." -ForegroundColor Yellow
+
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
     Write-Host "$($VirtualMachineName) - Installing Active Directory and Certificate Services" -ForegroundColor Green
