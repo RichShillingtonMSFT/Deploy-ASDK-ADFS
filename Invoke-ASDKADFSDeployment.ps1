@@ -145,10 +145,10 @@ catch
 
 $Locations = Get-AzLocation
 $Location = $Locations | Out-GridView -Title "Please Select the Azure Resource Deployment Region." -PassThru
-#endregion
 
 Write-Host "Connected to Azure" -ForegroundColor Green
 Write-Host ""
+#endregion
 
 #region Create Resource Group
 $LabResourceGroup = Get-AzResourceGroup -Name $LabResourceGroupName -Location $Location.Location -ErrorAction SilentlyContinue
@@ -161,6 +161,9 @@ Write-Host ""
 #endregion
 
 #region Template Deployment
+Write-host "Begining Template Deployment. This should only take a couple of minutes." -ForegroundColor Yellow
+Write-Host ""
+
 $TemplateParams = @{
     virtualMachineAdminUserName = $VirtualMachineAdminUserName
     virtualMachineAdminPassword = $VirtualMachineAdminPassword
@@ -179,18 +182,22 @@ $TemplateParams = @{
     sourceAddressForRDP = $SourceAddressForRDP
 }
 
-Write-Host "Starting Template Deployment" -ForegroundColor Green
+Write-Host "Template Deployment in progress..." -ForegroundColor Green
 Write-Host ""
 
 $StartTime = Get-Date -DisplayHint Time
+
 $Deployment = New-AzResourceGroupDeployment -Name ASDKDeployment `
     -ResourceGroupName $LabResourceGroup.ResourceGroupName `
     -TemplateUri 'https://raw.githubusercontent.com/RichShillingtonMSFT/Deploy-ASDK-ADFS/main/azuredeploy.json' `
     -TemplateParameterObject $TemplateParams -Mode Incremental
 
 $EndTime = Get-Date -DisplayHint Time
+
 $DeployedVirtualMachines = $Deployment.Outputs.Values.value
+
 Write-Host "Template Deployment Complete" -ForegroundColor Green
+Write-Host ""
 Write-Host "Start Time $($StartTime)" -ForegroundColor White
 Write-Host "End Time $($EndTime)" -ForegroundColor White
 Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
