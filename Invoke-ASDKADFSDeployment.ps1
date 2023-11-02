@@ -87,6 +87,7 @@ Param
 )
 
 #region Functions & Variables
+$WarningPreference = 'SilentlyContinue'
 $ScriptStartTime = Get-Date -DisplayHint Time
 $ASDKLinkUri = "https://asdkdeploymentsa.blob.core.usgovcloudapi.net/asdks/$ASDKVersion/CloudBuilder.vhdx"
 
