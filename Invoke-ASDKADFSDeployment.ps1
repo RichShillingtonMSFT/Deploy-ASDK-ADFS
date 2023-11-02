@@ -1004,7 +1004,7 @@ Start-Sleep -Seconds 200
 
 winrm s winrm/config/client '@{TrustedHosts="*"}'
 
-$ADSession = New-PSSession -ComputerName 'AD-01' -Credential $DomainCredential
+$ADSession = New-PSSession -ComputerName '10.100.100.10' -Credential $DomainCredential
 
 Copy-Item E:\SetupFiles\software\HubModules.zip -Destination C:\ -ToSession $ADSession
 Copy-Item E:\SetupFiles\software\Scripts.zip -Destination C:\ -ToSession $ADSession
@@ -1080,7 +1080,7 @@ $LocalCredential = New-Object System.Management.Automation.PSCredential($Usernam
 $Username = 'Contoso\Administrator'
 $DomainCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
 
-$ADSession = New-PSSession -ComputerName 'AD-01' -Credential $DomainCredential
+$ADSession = New-PSSession -ComputerName '10.100.100.10' -Credential $DomainCredential
 
 Invoke-Command -Session $ADSession -ScriptBlock {Add-CATemplate -Name "AzureStack" -Force} -Verbose -ErrorAction 'Stop'
 
