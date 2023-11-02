@@ -86,6 +86,7 @@ Param
     [String]$SourceAddressForRDP
 )
 
+#region Functions & Variables
 $ScriptStartTime = Get-Date -DisplayHint Time
 $ASDKLinkUri = "https://asdkdeploymentsa.blob.core.usgovcloudapi.net/asdks/$ASDKVersion/CloudBuilder.vhdx"
 
@@ -112,6 +113,7 @@ Function ConvertFrom-SecureStringToPlainText
 }
 
 $AdminPassword = ConvertFrom-SecureStringToPlainText -SecurePassword $VirtualMachineAdminPassword -ErrorAction 'Stop'
+#endregion
 
 #region Connect to Azure
 
