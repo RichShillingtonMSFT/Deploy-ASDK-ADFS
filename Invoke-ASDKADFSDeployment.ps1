@@ -1086,6 +1086,8 @@ $ADSession = New-PSSession -ComputerName '10.100.100.10' -Credential $DomainCred
 
 Invoke-Command -Session $ADSession -ScriptBlock {Add-CATemplate -Name "AzureStack" -Force} -Verbose -ErrorAction 'Stop'
 
+Start-Sleep -Seconds 30
+
 # Configure ADFS
 Invoke-Command -VMName 'ADFS-01' -Credential $LocalCredential -ScriptBlock {Add-Computer -DomainName 'Contoso.local' -Credential $Using:DomainCredential -Restart} -Verbose -ErrorAction 'Stop'
 
