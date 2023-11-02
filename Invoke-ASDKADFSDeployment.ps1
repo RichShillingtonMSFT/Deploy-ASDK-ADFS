@@ -1147,6 +1147,7 @@ Stop-Transcript
 
 #region Generate Deployment Certificates
 Write-Host "Now we are getting close. Just a few more things to take care of..." -ForegroundColor Yellow
+Write-Host "I need to generate the Azure Stack Deployment Certificates." -ForegroundColor Yellow
 Write-Host ""
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
@@ -1262,6 +1263,7 @@ ConvertTo-AzsPFX -Path $CERPath -pfxPassword $PFXPassword -ExportPath $PFXExport
 #endregion
 
 #region Copy Deployment Certificates
+Write-Host "Going to use PowerShell Remoting to copy the certificate files from the CA to the Setup Folder." -ForegroundColor Yellow
 Write-Host "Only 6 more steps. It is sooooo close now!" -ForegroundColor Yellow
 Write-Host ""
 
@@ -1322,6 +1324,10 @@ Remove-PSSession $ADSession
 #endregion
 
 #region Create Azure Stack Deployment Script
+Write-Host "I need to replace the Azure Stack Deployment Script with one I made just for you!" -ForegroundColor Yellow
+Write-Host "Do you feel special now?" -ForegroundColor Yellow
+Write-Host ""
+
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
     Write-Host "$($VirtualMachineName) - Creating the Azure Stack Deployment Script." -ForegroundColor Green
@@ -1683,7 +1689,7 @@ Get-NetAdapter | Where-Object {$_.Name -like "*ADSwitch*"} | Disable-NetAdapter 
 
         $EndTime = Get-Date -DisplayHint Time
 
-        if ($Result.Value.Message -like "*error*") 
+        if (($Result.Value.Message -contains "error") -and ($Result.Value.Message -notlike "*errorid*")) 
         {
             throw $($Error[0])
             break
