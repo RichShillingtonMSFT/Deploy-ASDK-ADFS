@@ -1059,10 +1059,9 @@ Stop-Transcript
     }
 }
 #endregion
-
+Pause
 #region Make the Azure Stack Certificate Template available and join ADFS to the Domain
-Write-Host "Now I am going to make the Azure Stack Certificate Template available and join ADFS to the Domain."
-Write-Host "" -ForegroundColor Yellow
+Write-Host "Now I am going to make the Azure Stack Certificate Template available and join ADFS to the Domain." -ForegroundColor Yellow
 Write-Host ""
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
@@ -1916,12 +1915,37 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
 }
 #endregion
 
+#region Export VM Information to Users Documents folder
+$DataTable = New-Object System.Data.DataTable
+$DataTable.Columns.Add("VMName","string") | Out-Null
+$DataTable.Columns.Add("PublicIP","string") | Out-Null
+
+foreach ($DeployedVirtualMachine in $DeployedVirtualMachines)
+{
+    $VM = Get-AzVM -ResourceGroupName $LabResourceGroup.ResourceGroupName -Name $DeployedVirtualMachine
+    $NIC = $VM.NetworkProfile.NetworkInterfaces[0].Id.Split('/') | select -Last 1
+    $PublicIPName =  (Get-AzNetworkInterface -ResourceGroupName $LabResourceGroup.ResourceGroupName -Name $NIC).IpConfigurations.PublicIpAddress.Id.Split('/') | select -Last 1
+    $PublicIIAddress = (Get-AzPublicIpAddress -ResourceGroupName $LabResourceGroup.ResourceGroupName -Name $PublicIPName).IpAddress
+
+    $NewRow = $DataTable.NewRow()
+    $NewRow.VMName = $($DeployedVirtualMachine)
+    $NewRow.PublicIP = $($PublicIIAddress)
+    $DataTable.Rows.Add($NewRow)
+}
+
+$CSVFileName = 'DeployedVMs' + $(Get-Date -f yyyy-MM-dd) + '.csv'
+$DataTable | Export-Csv "$ENV:UserProfile\Documents\$CSVFileName" -NoTypeInformation
+#endregion
+
 $ScriptEndTime = Get-Date -DisplayHint Time
 
 Write-Host "Deployment Jobs are complete." -ForegroundColor Green
 Write-Host $('Total Duration: {0:mm} min {0:ss} sec' -f ($ScriptEndTime-$ScriptStartTime)) -ForegroundColor Yellow
 Write-Host ''
 Write-Host "Depending on the Virtual Machine Sku, it can take 12-18 Hours to complete the ASDK Install." -ForegroundColor Yellow
+Write-Host ''
 Write-Host "You can connect to the ASDK Virtual Machines using RDP to monitor the progress." -ForegroundColor Green
+Write-Host "A list of VMs and their Public IPs can be found here:"$ENV:UserProfile\Documents\$CSVFileName"" -ForegroundColor Green
+Write-Host ''
 Write-Host "Prior to Domain Setup completion, the login UserName will be .\Administrator" -ForegroundColor Green
 Write-Host "Once the ASDK Domain Setup is complete, the login UserName will be AzureStack\AzureStackAdmin" -ForegroundColor Green
