@@ -670,7 +670,7 @@ Start-Process $($VSCodeSetup.FullName) -ArgumentList $installerArguments -Wait
 
 #region Create AD,CA & ADFS Virtual Machines
 Write-Host "Now I must Configure the Hyper-V host and setup the Domain Controller, Certificate Services & ADFS" -ForegroundColor Yellow
-Write-host "This takes about 35 minutes. I am doing lots of work for you. Settle Down..." -ForegroundColor Yellow
+Write-host "This should take less than 20 minutes. I am doing lots of work for you. Settle Down..." -ForegroundColor Yellow
 Write-Host ""
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
@@ -872,7 +872,10 @@ Foreach ($Server in $Servers)
 
 #region Install Active Directory and Configure Certificate Services
 $NowTime = Get-Date -DisplayHint Time
-Write-Host $('It has only been like {0:mm} minutes. Calm Down!.. It is getting there.' -f ($NowTime-$ScriptStartTime)) -ForegroundColor Yellow
+Write-Host "Now I will install Active Directory & Certificate Services."
+Write-Host "I will install create the Azure Stack Deployment Certificate Template, and join ADFS to the Domain."
+Write-Host "I will install create the Azure Stack Deployment Certificate Template, and join ADFS to the Domain."
+Write-Host $('It has only been like {0:mm} minutes since we started this script. Calm Down!.. It is getting there.' -f ($NowTime-$ScriptStartTime)) -ForegroundColor Yellow
 Write-Host ""
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
@@ -882,7 +885,7 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
 
 $ScriptString = @'
 #Configure AD CS
-
+Start-Transcript -Path "C:\logs\ConfigureADCS.txt" -NoClobber -Force
 $VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
 
 $Username = '.\Administrator'
@@ -1012,14 +1015,18 @@ Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
     Expand-Archive -Path "C:\Scripts.zip" -DestinationPath "C:\Scripts" -Force
 }
 
-Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {Restart-Computer -Force -Wait 0} -Verbose -ErrorAction 'Stop'
+Invoke-Command -Session $ADSession -ScriptBlock {Restart-Computer -Force -Wait 0} -Verbose -ErrorAction 'Stop'
 
 Start-Sleep -Seconds 120
 
-Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {Add-CATemplate -Name "AzureStack" -Force} -Verbose -ErrorAction 'Stop'
+$ADSession = New-PSSession -ComputerName 'AD-01' -Credential $DomainCredential
+
+Invoke-Command -Session $ADSession -ScriptBlock {Add-CATemplate -Name "AzureStack" -Force} -Verbose -ErrorAction 'Stop'
 
 # Configure ADFS
 Invoke-Command -VMName 'ADFS-01' -Credential $LocalCredential -ScriptBlock {Add-Computer -DomainName 'Contoso.local' -Credential $Using:DomainCredential -Restart} -Verbose -ErrorAction 'Stop'
+
+Stop-Transcript
 '@
 
     $ScriptString = $ScriptString.Replace('[AdminPassword]',"$AdminPassword")
@@ -1178,7 +1185,7 @@ ConvertTo-AzsPFX -Path $CERPath -pfxPassword $PFXPassword -ExportPath $PFXExport
 #endregion
 
 #region Copy Deployment Certificates
-Write-Host "Only 5 more steps. It is sooooo close now!" -ForegroundColor Yellow
+Write-Host "Only 6 more steps. It is sooooo close now!" -ForegroundColor Yellow
 Write-Host ""
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
@@ -1572,7 +1579,7 @@ Add-Content -Path `$InstallScript.FullName -Value `$InstallAzureStackPOCScript -
 #endregion
 
 #region Remove Hyper-V Virtual Machines
-Write-Host "Only 3 more steps. Only a few more to go!" -ForegroundColor Yellow
+Write-Host "Only 4 more steps. Only a few more to go!" -ForegroundColor Yellow
 Write-Host ""
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
@@ -1624,7 +1631,7 @@ W           Write-Host ""
 #endregion
 
 #region Setup ASDK Install Job
-Write-Host "Only one more step after this! hang in there buddy..." -ForegroundColor Yellow
+Write-Host "Only 2 more step after this! hang in there buddy..." -ForegroundColor Yellow
 Write-Host ""
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
@@ -1668,6 +1675,105 @@ Register-ScheduledTask @registrationParams -User "`$env:ComputerName\Administrat
     $ScriptString = $ScriptString.Replace('[AdminPassword]',"$AdminPassword")
     $ScriptString = $ScriptString.Replace('[TimeServerIp]',"$TimeServer")
     $ScriptString = $ScriptString.Replace('[DNSForwarder]',"$DNSForwarder")
+
+    try
+    {
+        $StartTime = Get-Date -DisplayHint Time
+
+        $Job = Invoke-AzVMRunCommand -VMName $VirtualMachineName `
+            -ResourceGroupName $LabResourceGroup.ResourceGroupName `
+            -CommandId 'RunPowerShellScript' `
+            -ScriptString $ScriptString -AsJob
+
+        $Result = Get-Job -Id $Job.Id | Wait-Job | Receive-Job
+
+        $EndTime = Get-Date -DisplayHint Time
+
+        if ($Result.Value.Message -like "*error*") 
+        {
+            throw $($Error[0])
+            break
+        }
+        else
+        {
+            Write-Host "PowerShell Job $($Result.Status)" -ForegroundColor Green
+            Write-Host "$($Result.Value.Message)" -ForegroundColor Green
+            Write-Host "StartTime $($StartTime)" -ForegroundColor White
+            Write-Host "EndTime $($EndTime)" -ForegroundColor White
+            Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
+            Write-Host ""
+        }
+    }
+    catch
+    {
+        Write-Host "Job Failed: `n $($Result.Value.Message)" -ForegroundColor Red
+        Write-Host "Error while running the PowerShell Job" -ForegroundColor Red
+        break
+    }
+}
+#endregion
+
+#region Create Script to Finalize the Install
+Write-Host "Just need to drop a script on the C Drive for you to use later." -ForegroundColor Yellow
+Write-Host ""
+
+foreach ($VirtualMachineName in $DeployedVirtualMachines)
+{
+    Write-Host "$($VirtualMachineName) - Creating Post Deployment Script." -ForegroundColor Green
+
+$ScriptString = @"
+`$PostInstallScript = New-Item -Path C:\ -Name FinalizeServers.ps1 -ItemType File -Force
+
+`$FinalizeAzureStackPOCScript = @'
+Get-NetAdapter | Where-Object {`$_.Name -like "*ADSwitch*"} | Enable-NetAdapter
+
+`$Password = '[AdminPassword]' | ConvertTo-SecureString -asPlainText -Force
+`$Username = 'Contoso\Administrator'
+`$Credential = New-Object System.Management.Automation.PSCredential(`$Username,`$Password)
+
+`$Servers = @(
+    @{ServerName = 'AD-01';IPAddress = '10.100.100.10'}
+    @{ServerName = 'ADFS-01';IPAddress = '10.100.100.11'}
+)
+
+Foreach (`$Server in `$Servers)
+{
+    New-VM -Name `$Server.ServerName -BootDevice VHD -VHDPath ('C:\VMDisks\' + `$Server.ServerName + '.vhd') -MemoryStartupBytes 4GB -SwitchName 'ADSwitch'
+    Set-VMProcessor -VMName `$Server.ServerName -count 2
+    Start-VM -Name `$Server.ServerName
+    Start-Sleep -Seconds 200
+    `$InterfaceIndex = Invoke-Command -VMName `$Server.ServerName -Credential `$Credential -ScriptBlock {(Get-NetAdapter).ifIndex}
+    Invoke-Command -VMName `$Server.ServerName -Credential `$Credential -ScriptBlock {
+        Set-DnsClientServerAddress -InterfaceIndex `$Using:InterfaceIndex -ServerAddresses 10.100.100.10,8.8.8.8;
+        New-NetIPAddress -InterfaceIndex `$Using:InterfaceIndex -IPAddress `$Using:Server.IPAddress -PrefixLength 24 -DefaultGateway '10.100.100.1'
+    }
+    Start-Sleep -Seconds 20
+    Get-VM -Name `$Server.ServerName | Restart-VM -Force -Wait
+    Start-Sleep -Seconds 200
+    `$InterfaceIndex = Invoke-Command -VMName `$Server.ServerName -Credential `$Credential -ScriptBlock {(Get-NetAdapter).ifIndex} 
+    `$IPCheck = Invoke-Command -VMName `$Server.ServerName -Credential `$Credential -ScriptBlock {Get-NetIPAddress -InterfaceIndex `$Using:InterfaceIndex} 
+    if (`$IPCheck.IPAddress[1] -ne `$Server.IPAddress)
+    {
+        Invoke-Command -VMName `$Server.ServerName -Credential `$Credential -ScriptBlock {
+            Set-DnsClientServerAddress -InterfaceIndex `$Using:InterfaceIndex -ServerAddresses 10.100.100.10,8.8.8.8;
+            New-NetIPAddress -InterfaceIndex `$Using:InterfaceIndex -IPAddress `$Using:Server.IPAddress -PrefixLength 24 -DefaultGateway '10.100.100.1'
+        }
+    }
+}
+
+New-ADUser -AccountPassword `$Password -UserPrincipalName 'breakglass@azurestack.local' -PasswordNeverExpires:`$true -Name breakglass -Enabled:`$true
+`$User = Get-ADUser breakglass
+`$Groups = Get-ADGroup -Filter * | Where-Object {`$_.Name -like "*admin*"}
+foreach (`$Group in `$Groups)
+{
+    Add-ADGroupMember -Identity `$Group.Name -Members `$User.Name
+}
+'@
+
+Add-Content -Path `$PostInstallScript.FullName -Value `$FinalizeAzureStackPOCScript -Force | Set-Content -Force
+
+"@
+    $ScriptString = $ScriptString.Replace('[AdminPassword]',"$AdminPassword")
 
     try
     {
