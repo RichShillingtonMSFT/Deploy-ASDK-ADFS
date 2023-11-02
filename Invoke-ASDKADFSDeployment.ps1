@@ -1925,8 +1925,8 @@ $DataTable.Columns.Add("PublicIP","string") | Out-Null
 foreach ($DeployedVirtualMachine in $DeployedVirtualMachines)
 {
     $VM = Get-AzVM -ResourceGroupName $LabResourceGroup.ResourceGroupName -Name $DeployedVirtualMachine
-    $NIC = $VM.NetworkProfile.NetworkInterfaces[0].Id.Split('/') | select -Last 1
-    $PublicIPName =  (Get-AzNetworkInterface -ResourceGroupName $LabResourceGroup.ResourceGroupName -Name $NIC).IpConfigurations.PublicIpAddress.Id.Split('/') | select -Last 1
+    $NIC = $VM.NetworkProfile.NetworkInterfaces[0].Id.Split('/') | Select-Object -Last 1
+    $PublicIPName =  (Get-AzNetworkInterface -ResourceGroupName $LabResourceGroup.ResourceGroupName -Name $NIC).IpConfigurations.PublicIpAddress.Id.Split('/') | Select-Object -Last 1
     $PublicIIAddress = (Get-AzPublicIpAddress -ResourceGroupName $LabResourceGroup.ResourceGroupName -Name $PublicIPName).IpAddress
 
     $NewRow = $DataTable.NewRow()
