@@ -1184,6 +1184,68 @@ Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
 
         Add-CATemplate -Name 'AzureStack' -force
     }
+
+    [String]$ExceptionErrors = $Error.Exception
+    if ($ExceptionErrors)
+    {
+        $Error.Clear()
+        Restart-Service CertSvc -Force
+        Start-Sleep -Seconds 120
+        if ($ExceptionErrors -like "*template does not exist in the domain.*")
+        {
+            $domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
+            $pdc = $domain.PdcRoleOwner.Name
+            $rootDSE = [adsi]"LDAP://$pdc/rootdse"
+
+            # distinguishedName where the certificate templates are stored in AD
+            $certificateTemplatesBaseDN = "CN=Certificate Templates,CN=Public Key Services,CN=Services,$($rootDSE.configurationNamingContext)"
+            $certificateTemplatesBaseDE = [adsi]"LDAP://$pdc/$certificateTemplatesBaseDN"
+
+            $templates = $certificateTemplatesBaseDE| Select-Object -ExpandProperty Children
+
+            if ($templates.distinguishedName -contains "CN=AzureStack,CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,DC=contoso,DC=local")
+            {
+                Add-CATemplate -Name 'AzureStack' -force
+            }
+
+            else
+            {
+                do
+                {
+                    Stop-Service CertSvc
+
+                    Start-Sleep -Seconds 5
+
+                    Start-Service CertSvc
+
+                    Start-Sleep -Seconds 5
+
+                    $domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
+                    $pdc = $domain.PdcRoleOwner.Name
+                    $rootDSE = [adsi]"LDAP://$pdc/rootdse"
+
+                    # distinguishedName where the certificate templates are stored in AD
+                    $certificateTemplatesBaseDN = "CN=Certificate Templates,CN=Public Key Services,CN=Services,$($rootDSE.configurationNamingContext)"
+                    $certificateTemplatesBaseDE = [adsi]"LDAP://$pdc/$certificateTemplatesBaseDN"
+
+                    $templates = $certificateTemplatesBaseDE| Select-Object -ExpandProperty Children
+                }
+                Until (($templates.distinguishedName -contains "CN=AzureStack,CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,DC=contoso,DC=local"))
+
+                Add-CATemplate -Name 'AzureStack' -force
+            }
+        }
+        else
+        {
+            Add-CATemplate -Name 'AzureStack' -force
+        }
+    }
+}
+
+if ($Error)
+{
+    Throw $($Error.Exception)
+    break
 }
 '@
 
@@ -1213,7 +1275,7 @@ else
     Write-Host ""
 }
 #endregion
-Pause
+
 #region Join ADFS to the Domain
 Write-Host "Now I am going to join ADFS-01 to the Domain." -ForegroundColor Yellow
 Write-Host "This should take less than 4 minutes." -ForegroundColor Yellow
@@ -1276,7 +1338,7 @@ else
     Write-Host ""
 }
 #endregion
-Pause
+
 #region Generate Deployment Certificates
 Write-Host "Now we are getting close. Just a few more things to take care of..." -ForegroundColor Yellow
 Write-Host "I need to generate the Azure Stack Deployment Certificates." -ForegroundColor Yellow
@@ -1382,7 +1444,7 @@ else
     Write-Host ""
 }
 #endregion
-Pause
+
 #region Copy Deployment Certificates
 Write-Host "Going to use PowerShell Remoting to copy the certificate files from the CA to the Setup Folder." -ForegroundColor Yellow
 Write-Host "Only 6 more steps. It is sooooo close now!" -ForegroundColor Yellow
