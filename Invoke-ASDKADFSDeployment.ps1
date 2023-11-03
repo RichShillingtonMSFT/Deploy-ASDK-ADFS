@@ -87,7 +87,7 @@ Param
 )
 
 #region Functions & Variables
-$WarningPreference = 'ignore'
+$WarningPreference = 'SilentlyContinue'
 $VerbosePreference = 'Continue'
 
 $ScriptStartTime = (Get-Date)
@@ -231,7 +231,7 @@ foreach ($DeployedVirtualMachine in $DeployedVirtualMachines)
 }
 
 $CSVFileName = $($LabResourceGroup.ResourceGroupName) + '-DeployedVMs-' + $(Get-Date -f yyyy-MM-dd) + '.csv'
-$DataTable | Export-Csv "$ENV:UserProfile\Documents\$CSVFileName" -NoTypeInformation
+$DataTable | Export-Csv "$ENV:UserProfile\Documents\$CSVFileName" -NoTypeInformation -Force
 #endregion
 
 #region Configure Virtual Machine Disks
@@ -308,6 +308,7 @@ Remove-Item "$($InstallFilesDirectory.FullName)\azcopy.zip" -Force;
 azcopy copy '[ASDKLinkUri]' "$($InstallFilesDirectory.FullName)\CloudBuilder.vhdx";
 azcopy copy 'https://asdkdeploymentsa.blob.core.usgovcloudapi.net/vhds/2019Server.vhd' "$($InstallFilesDirectory.FullName)\2019Server.vhd";
 azcopy copy 'https://asdkdeploymentsa.blob.core.usgovcloudapi.net/software' $($InstallFilesDirectory.FullName) --recursive=true;
+azcopy copy 'https://asdkdeploymentsa.blob.core.usgovcloudapi.net/dsc' $($InstallFilesDirectory.FullName) --recursive=true;
 '@
     
     $ScriptString = $ScriptString.Replace('[ASDKLinkUri]',"$ASDKLinkUri")
@@ -641,7 +642,7 @@ $EndTime = (Get-Date)
 
 if (($Result.Value.DisplayStatus | Select-Object -Unique) -ne 'Provisioning succeeded') 
 {
-    throw 'Failed to prepare VM Disks!'
+    throw 'Failed to install software!'
     break
 }
 else
@@ -832,7 +833,7 @@ $EndTime = (Get-Date)
 
 if (($Result.Value.DisplayStatus | Select-Object -Unique) -ne 'Provisioning succeeded') 
 {
-    throw 'Failed to prepare VM Disks!'
+    throw 'Failed to create Domain VMs!'
     break
 }
 else
@@ -854,7 +855,7 @@ $StartTime = (Get-Date)
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
-    Write-Host "$($VirtualMachineName) - Installing Active Directory and Certificate Services" -ForegroundColor Green
+    Write-Host "$($VirtualMachineName) - Installing Active Directory" -ForegroundColor Green
     Write-Host ""
 
 $ScriptString = @'
@@ -876,9 +877,7 @@ Install-ADDSForest -DomainName "contoso.local" `
     -DomainNetbiosName Contoso -Force
 }
 
-Start-Sleep -Seconds 120
-
-winrm s winrm/config/client '@{TrustedHosts="*"}'
+Start-Sleep -Seconds 420
 
 do
 {
@@ -907,7 +906,7 @@ $EndTime = (Get-Date)
 
 if (($Result.Value.DisplayStatus | Select-Object -Unique) -ne 'Provisioning succeeded') 
 {
-    throw 'Failed to prepare VM Disks!'
+    throw 'Failed to install Active Directory!'
     break
 }
 else
@@ -929,7 +928,7 @@ $StartTime = (Get-Date)
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
-    Write-Host "$($VirtualMachineName) - Installing Active Directory and Certificate Services" -ForegroundColor Green
+    Write-Host "$($VirtualMachineName) - Installing Certificate Services" -ForegroundColor Green
     Write-Host ""
 
 $ScriptString = @'
@@ -1011,6 +1010,87 @@ $commonConfigurationData = @{
 }
 & $configFunc @dscParameters -ConfigurationData $commonConfigurationData -OutputPath $DscWorkPath
 Start-DscConfiguration -Path .\ -Force -Wait -Verbose
+} -Verbose
+
+[String]$ExceptionErrors = $Error.Exception
+if ($ExceptionErrors)
+{
+    if ($ExceptionErrors -like "*Failed to start service `'Active Directory Certificate Services (certsvc)`'*")
+    {
+        Get-Service CertSvc | Start-Service
+        $Error.Clear()
+        $Results = Invoke-Command -Session $ADSession -ScriptBlock {
+            $VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
+
+            $Username = 'Contoso\Administrator'
+            $DomainCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
+
+            $configFunc = "CaRootConfig"
+            Set-Location 'C:\DSCConfigs'
+            $scriptFilePathName = ".\CaRootConfig.ps1"
+            Write-Verbose "Dot sourcing functions in PS1 script '$scriptFilePathName'"
+            . $scriptFilePathName # load the DSC configuration functions into session
+
+            $dscParameters = @{
+                Hostname = $ENV:Computername
+                Credential = $DomainCredential
+                CaCommonName = 'AD-01-CA' 
+                DomainDistinguishedName = 'CN=AD-01-CA,DC=Contoso,DC=local' 
+                DomainName = 'contoso.local'
+            }
+
+            $DscWorkPath = 'C:\DSCConfigs'
+            $certificateFilePathName = Join-Path -Path $DscWorkPath -ChildPath "$(hostname).cer"
+            $cert = Get-ChildItem -Path 'Cert:\LocalMachine\My' -DocumentEncryptionCert | Where-Object -FilterScript { $psItem.Subject -eq "DSC Document Encryption" }
+            if ($null -eq $cert) 
+            {
+                $cert = New-SelfSignedCertificate -Subject "DSC Document Encryption" -Type DocumentEncryptionCert -TextExtension "2.5.29.17={text}DNS=localhost" -CertStoreLocation Cert:\LocalMachine\My -ErrorAction Stop
+            }
+            $null = $cert | Export-Certificate -Type CERT -FilePath $certificateFilePathName -Force
+
+            Configuration LcmSettings {
+                param(
+                    [Parameter(Mandatory = $true)]
+                    [Alias("Thumbprint")]
+                    [ValidateNotNullOrEmpty()]
+                    [string]
+                    $CertificateId
+                )
+
+                node localhost {
+                    LocalConfigurationManager {
+                        ConfigurationMode = "ApplyOnly"
+                        RebootNodeIfNeeded = $true
+                        DebugMode = "ForceModuleImport"
+                        CertificateId = $CertificateId
+                    }
+                }
+            }
+
+            & LcmSettings -CertificateId $cert.Thumbprint -OutputPath $DscWorkPath -Verbose
+
+            Set-DscLocalConfigurationManager -Path $DscWorkPath -Force -Verbose
+
+            $commonConfigurationData = @{
+                AllNodes = @(
+                    @{
+                        NodeName = 'localhost'
+                        PsDscAllowDomainUser = $true
+                        CertificateFile = "$certificateFilePathName"
+                        Thumbprint = "$($cert.Thumbprint)"
+                    }
+                )
+            }
+            & $configFunc @dscParameters -ConfigurationData $commonConfigurationData -OutputPath $DscWorkPath
+            Start-DscConfiguration -Path .\ -Force -Wait -Verbose
+        } -Verbose
+    }
+}
+
+if ($Error)
+{
+    Throw $($Error.Exception)
+    break
 }
 '@
 
@@ -1027,7 +1107,7 @@ $EndTime = (Get-Date)
 
 if (($Result.Value.DisplayStatus | Select-Object -Unique) -ne 'Provisioning succeeded') 
 {
-    throw 'Failed to prepare VM Disks!'
+    throw 'Failed to install Certificate Services!'
     break
 }
 else
@@ -1133,7 +1213,7 @@ else
     Write-Host ""
 }
 #endregion
-
+Pause
 #region Join ADFS to the Domain
 Write-Host "Now I am going to join ADFS-01 to the Domain." -ForegroundColor Yellow
 Write-Host "This should take less than 4 minutes." -ForegroundColor Yellow
@@ -1142,11 +1222,10 @@ $StartTime = (Get-Date)
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
-    Write-Host "$($VirtualMachineName) - Making Azure Stack Certificate Template available and joining ADFS to the Domain" -ForegroundColor Green
+    Write-Host "$($VirtualMachineName) - Joining ADFS to the Domain" -ForegroundColor Green
     Write-Host ""
 
 $ScriptString = @'
-#Configure AD CS
 $VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
 
 $Username = '.\Administrator'
@@ -1197,7 +1276,7 @@ else
     Write-Host ""
 }
 #endregion
-
+Pause
 #region Generate Deployment Certificates
 Write-Host "Now we are getting close. Just a few more things to take care of..." -ForegroundColor Yellow
 Write-Host "I need to generate the Azure Stack Deployment Certificates." -ForegroundColor Yellow
@@ -1303,7 +1382,7 @@ else
     Write-Host ""
 }
 #endregion
-
+Pause
 #region Copy Deployment Certificates
 Write-Host "Going to use PowerShell Remoting to copy the certificate files from the CA to the Setup Folder." -ForegroundColor Yellow
 Write-Host "Only 6 more steps. It is sooooo close now!" -ForegroundColor Yellow
