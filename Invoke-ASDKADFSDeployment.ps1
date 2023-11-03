@@ -908,9 +908,10 @@ Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
         ValidityPeriodUnits = '3'
     }
     Install-AdcsCertificationAuthority @params -Force -Verbose
+    Restart-Computer -ComputerName LocalHost -Force -Wait 0
 } -Verbose
 
-Start-Sleep -Seconds 30
+Start-Sleep -Seconds 200
 
 Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
 $domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
