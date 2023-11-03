@@ -88,8 +88,9 @@ Param
 
 #region Functions & Variables
 $WarningPreference = 'SilentlyContinue'
+$VerbosePreference = 'Continue'
 
-$ScriptStartTime = Get-Date
+$ScriptStartTime = (Get-Date)
 
 $TemplateUri = 'https://raw.githubusercontent.com/RichShillingtonMSFT/Deploy-ASDK-ADFS/main/azuredeploy.json'
 
@@ -192,14 +193,14 @@ $TemplateParams = @{
 Write-Host "Template Deployment in progress..." -ForegroundColor Green
 Write-Host ""
 
-$StartTime = Get-Date
+$StartTime = (Get-Date)
 
 $Deployment = New-AzResourceGroupDeployment -Name ASDKDeployment `
     -ResourceGroupName $LabResourceGroup.ResourceGroupName `
     -TemplateUri $TemplateUri `
     -TemplateParameterObject $TemplateParams -Mode Incremental
 
-$EndTime = Get-Date
+$EndTime = (Get-Date)
 
 $DeployedVirtualMachines = $Deployment.Outputs.Values.value
 
@@ -207,15 +208,37 @@ Write-Host "Template Deployment Complete" -ForegroundColor Green
 Write-Host ""
 Write-Host "Start Time $($StartTime)" -ForegroundColor White
 Write-Host "End Time $($EndTime)" -ForegroundColor White
-Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
+Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime - $StartTime)) -ForegroundColor White
 Write-Host ""
+#endregion
+
+#region Export VM Information to Users Documents folder
+$DataTable = New-Object System.Data.DataTable
+$DataTable.Columns.Add("VMName","string") | Out-Null
+$DataTable.Columns.Add("PublicIP","string") | Out-Null
+
+foreach ($DeployedVirtualMachine in $DeployedVirtualMachines)
+{
+    $VM = Get-AzVM -ResourceGroupName $LabResourceGroup.ResourceGroupName -Name $DeployedVirtualMachine
+    $NIC = $VM.NetworkProfile.NetworkInterfaces[0].Id.Split('/') | Select-Object -Last 1
+    $PublicIPName =  (Get-AzNetworkInterface -ResourceGroupName $LabResourceGroup.ResourceGroupName -Name $NIC).IpConfigurations.PublicIpAddress.Id.Split('/') | Select-Object -Last 1
+    $PublicIIAddress = (Get-AzPublicIpAddress -ResourceGroupName $LabResourceGroup.ResourceGroupName -Name $PublicIPName).IpAddress
+
+    $NewRow = $DataTable.NewRow()
+    $NewRow.VMName = $($DeployedVirtualMachine)
+    $NewRow.PublicIP = $($PublicIIAddress)
+    $DataTable.Rows.Add($NewRow)
+}
+
+$CSVFileName = $($LabResourceGroup.ResourceGroupName) + '-DeployedVMs-' + $(Get-Date -f yyyy-MM-dd) + '.csv'
+$DataTable | Export-Csv "$ENV:UserProfile\Documents\$CSVFileName" -NoTypeInformation
 #endregion
 
 #region Configure Virtual Machine Disks
 Write-host "I am now going to configure the Virtual Machine Disks & Install Hyper-V." -ForegroundColor Yellow
 Write-host "This takes about 5 minutes. Please wait..." -ForegroundColor Yellow
 Write-Host ""
-$StartTime = Get-Date
+$StartTime = (Get-Date)
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
@@ -241,25 +264,24 @@ Install-WindowsFeature -Name Hyper-V -IncludeManagementTools
     Invoke-AzVMRunCommand -VMName $VirtualMachineName `
         -ResourceGroupName $LabResourceGroup.ResourceGroupName `
         -CommandId 'RunPowerShellScript' `
-        -ScriptString $ScriptString -AsJob
+        -ScriptString $ScriptString -AsJob | Out-Null
 }
 
-$EndTime = Get-Date
-$Job = Get-Job | Wait-Job
-$Result = $Job | Receive-Job
+$Result = Get-Job | Wait-Job | Receive-Job
+$EndTime = (Get-Date)
 
-if (($Result.Value.Message -contains "error") -and ($Result.Value.Message -notlike "*errorid*")) 
+if (($Result.Value.DisplayStatus | Select-Object -Unique) -ne 'Provisioning succeeded') 
 {
-    throw $($Error[0])
+    throw 'Failed to prepare VM Disks!'
     break
 }
 else
 {
-    Write-Host "PowerShell Job $($Result.Status)" -ForegroundColor Green
+    Write-Host "PowerShell Job $($Result.Value.DisplayStatus)" -ForegroundColor Green
     Write-Host "$($Result.Value.Message)" -ForegroundColor Green
     Write-Host "StartTime $($StartTime)" -ForegroundColor White
     Write-Host "EndTime $($EndTime)" -ForegroundColor White
-    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
+    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime - $StartTime)) -ForegroundColor White
     Write-Host ""
 }
 #endregion
@@ -268,7 +290,7 @@ else
 Write-host "I am now going to download setup files from Azure Storage." -ForegroundColor Yellow
 Write-host "This takes about 5 minutes. Please wait..." -ForegroundColor Yellow
 Write-Host ""
-$StartTime = Get-Date
+$StartTime = (Get-Date)
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
@@ -293,15 +315,17 @@ azcopy copy 'https://asdkdeploymentsa.blob.core.usgovcloudapi.net/software' $($I
     Invoke-AzVMRunCommand -VMName $VirtualMachineName `
         -ResourceGroupName $LabResourceGroup.ResourceGroupName `
         -CommandId 'RunPowerShellScript' `
-        -ScriptString $ScriptString -AsJob
+        -ScriptString $ScriptString -AsJob | Out-Null
 }
 
-$EndTime = Get-Date
 $Result = Get-Job | Wait-Job | Receive-Job
+$EndTime = (Get-Date)
 
-if (($Result.Value.Message -contains "error") -and ($Result.Value.Message -notlike "*errorid*")) 
+$Result.Value.Message | Out-File "$env:temp\temp.txt"
+$Results = Get-Content "$env:temp\temp.txt"
+if ((($Results |  Select-String -Pattern 'Number of File Transfers Failed: \s*\d+\s*' | Select-Object -Unique) -replace '\s','') -ne 'NumberofFileTransfersFailed:0')
 {
-    throw $($Error[0])
+    throw 'File Transfer Failed'
     break
 }
 else
@@ -310,7 +334,7 @@ else
     Write-Host "$($Result.Value.Message)" -ForegroundColor Green
     Write-Host "StartTime $($StartTime)" -ForegroundColor White
     Write-Host "EndTime $($EndTime)" -ForegroundColor White
-    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
+    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime - $StartTime)) -ForegroundColor White
     Write-Host ""
 }
 #endregion
@@ -319,30 +343,39 @@ else
 Write-host "Now I need to restart the Virtual Machines." -ForegroundColor Yellow
 Write-host "This can take up to 5 minutes. Please wait..." -ForegroundColor Yellow
 Write-Host ""
-$StartTime = Get-Date
+$StartTime = (Get-Date)
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
     Write-host "$($VirtualMachineName) - Restarting Virtual Machine." -ForegroundColor Green
 
-    Restart-AzVM -ResourceGroupName $LabResourceGroup.ResourceGroupName -Name $VirtualMachineName -AsJob
+    Restart-AzVM -ResourceGroupName $LabResourceGroup.ResourceGroupName -Name $VirtualMachineName -AsJob | Out-Null
 }
 
-$EndTime = Get-Date
 $Result = Get-Job | Wait-Job | Receive-Job
 
-if (($Result.Value.Message -contains "error") -and ($Result.Value.Message -notlike "*errorid*")) 
+foreach ($PublicIP in $DataTable.Rows.PublicIP)
 {
-    throw $($Error[0])
+    do 
+    {
+        $RDPTest = Test-NetConnection -ComputerName $PublicIP -Port 3389
+    }
+    until ($RDPTest.TcpTestSucceeded -eq $true)
+}
+
+$EndTime = (Get-Date)
+
+if ($Result.Status -ne 'Succeeded') 
+{
+    throw 'Virtual Machines Failed to Restart'
     break
 }
 else
 {
     Write-Host "PowerShell Job $($Result.Status)" -ForegroundColor Green
-    Write-Host "$($Result.Value.Message)" -ForegroundColor Green
     Write-Host "StartTime $($StartTime)" -ForegroundColor White
     Write-Host "EndTime $($EndTime)" -ForegroundColor White
-    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
+    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime - $StartTime)) -ForegroundColor White
     Write-Host ""
 }
 #endregion
@@ -351,7 +384,7 @@ else
 Write-Host "Now it is time to prepare the Virtual Machine VHDs and Configure the VM to boot from a VHD." -ForegroundColor Yellow
 Write-Host "Depending on Disk Speed, this can take a few minutes. Just relax...." -ForegroundColor Yellow
 Write-Host ""
-$StartTime = Get-Date
+$StartTime = (Get-Date)
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
@@ -501,24 +534,24 @@ bcdboot `$Prepare_Vhdx_DriveLetter':\Windows'
     Invoke-AzVMRunCommand -VMName $VirtualMachineName `
         -ResourceGroupName $LabResourceGroup.ResourceGroupName `
         -CommandId 'RunPowerShellScript' `
-        -ScriptString $ScriptString -AsJob
+        -ScriptString $ScriptString -AsJob | Out-Null
 }
 
-$EndTime = Get-Date
 $Result = Get-Job | Wait-Job | Receive-Job
+$EndTime = (Get-Date)
 
-if (($Result.Value.Message -contains "error") -and ($Result.Value.Message -notlike "*errorid*")) 
+if (($Result.Value.DisplayStatus | Select-Object -Unique) -ne 'Provisioning succeeded') 
 {
-    throw $($Error[0])
+    throw 'Failed to prepare VM Disks!'
     break
 }
 else
 {
-    Write-Host "PowerShell Job $($Result.Status)" -ForegroundColor Green
+    Write-Host "PowerShell Job $($Result.Value.DisplayStatus)" -ForegroundColor Green
     Write-Host "$($Result.Value.Message)" -ForegroundColor Green
     Write-Host "StartTime $($StartTime)" -ForegroundColor White
     Write-Host "EndTime $($EndTime)" -ForegroundColor White
-    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
+    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime - $StartTime)) -ForegroundColor White
     Write-Host ""
 }
 #endregion
@@ -527,47 +560,49 @@ else
 Write-host "Now I need to restart the Virtual Machines." -ForegroundColor Yellow
 Write-host "This can take up to 5 minutes. Please wait..." -ForegroundColor Yellow
 Write-Host ""
-$StartTime = Get-Date
+$StartTime = (Get-Date)
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
     Write-host "$($VirtualMachineName) - Restarting Virtual Machine." -ForegroundColor Green
     Write-Host ""
 
-    Restart-AzVM -ResourceGroupName $LabResourceGroup.ResourceGroupName -Name $VirtualMachineName -AsJob
+    Restart-AzVM -ResourceGroupName $LabResourceGroup.ResourceGroupName -Name $VirtualMachineName -AsJob | Out-Null
 }
 
-$EndTime = Get-Date
 $Result = Get-Job | Wait-Job | Receive-Job
 
-if (($Result.Value.Message -contains "error") -and ($Result.Value.Message -notlike "*errorid*")) 
+foreach ($PublicIP in $DataTable.Rows.PublicIP)
 {
-    throw $($Error[0])
+    do 
+    {
+        $RDPTest = Test-NetConnection -ComputerName $PublicIP -Port 3389
+    }
+    until ($RDPTest.TcpTestSucceeded -eq $true)
+}
+
+$EndTime = (Get-Date)
+
+if ($Result.Status -ne 'Succeeded') 
+{
+    throw 'Virtual Machines Failed to Restart'
     break
 }
 else
 {
     Write-Host "PowerShell Job $($Result.Status)" -ForegroundColor Green
-    Write-Host "$($Result.Value.Message)" -ForegroundColor Green
     Write-Host "StartTime $($StartTime)" -ForegroundColor White
     Write-Host "EndTime $($EndTime)" -ForegroundColor White
-    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
+    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime - $StartTime)) -ForegroundColor White
     Write-Host ""
 }
-#endregion
-
-#region Wait for VM VHD Boot
-Write-host "Now we need to wait a few minutes for the Virtual Machines to complete setup..." -ForegroundColor Yellow
-Write-host "This takes about 7 minutes. Please wait..." -ForegroundColor Yellow
-Write-Host ""
-Start-Sleep -Seconds 380
 #endregion
 
 #region resize OS Disk & Install Software
 Write-Host "Now I will expand the OS Disk and Install some additional Software." -ForegroundColor Yellow
 Write-host "This should take less than 5 minutes. Please wait..." -ForegroundColor Yellow
 Write-Host ""
-$StartTime = Get-Date
+$StartTime = (Get-Date)
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
@@ -598,33 +633,33 @@ Start-Process $($VSCodeSetup.FullName) -ArgumentList $installerArguments -Wait
     Invoke-AzVMRunCommand -VMName $VirtualMachineName `
         -ResourceGroupName $LabResourceGroup.ResourceGroupName `
         -CommandId 'RunPowerShellScript' `
-        -ScriptString $ScriptString -AsJob
+        -ScriptString $ScriptString -AsJob | Out-Null
 }
 
-$EndTime = Get-Date
 $Result = Get-Job | Wait-Job | Receive-Job
+$EndTime = (Get-Date)
 
-if (($Result.Value.Message -contains "error") -and ($Result.Value.Message -notlike "*errorid*")) 
+if (($Result.Value.DisplayStatus | Select-Object -Unique) -ne 'Provisioning succeeded') 
 {
-    throw $($Error[0])
+    throw 'Failed to prepare VM Disks!'
     break
 }
 else
 {
-    Write-Host "PowerShell Job $($Result.Status)" -ForegroundColor Green
+    Write-Host "PowerShell Job $($Result.Value.DisplayStatus)" -ForegroundColor Green
     Write-Host "$($Result.Value.Message)" -ForegroundColor Green
     Write-Host "StartTime $($StartTime)" -ForegroundColor White
     Write-Host "EndTime $($EndTime)" -ForegroundColor White
-    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
+    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime - $StartTime)) -ForegroundColor White
     Write-Host ""
 }
 #endregion
 
 #region Create AD,CA & ADFS Virtual Machines
 Write-Host "Now I must Configure the Hyper-V host and setup the Domain Controller, Certificate Services & ADFS" -ForegroundColor Yellow
-Write-host "This should take about 16-20 minutes. I am doing lots of work for you. Settle Down..." -ForegroundColor Yellow
+Write-host "This should take about 15-20 minutes. I am doing lots of work for you. Settle Down..." -ForegroundColor Yellow
 Write-Host ""
-$StartTime = Get-Date
+$StartTime = (Get-Date)
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
@@ -789,24 +824,24 @@ Foreach ($Server in $Servers)
     Invoke-AzVMRunCommand -VMName $VirtualMachineName `
         -ResourceGroupName $LabResourceGroup.ResourceGroupName `
         -CommandId 'RunPowerShellScript' `
-        -ScriptString $ScriptString -AsJob
+        -ScriptString $ScriptString -AsJob | Out-Null
 }
 
-$EndTime = Get-Date
 $Result = Get-Job | Wait-Job | Receive-Job
+$EndTime = (Get-Date)
 
-if (($Result.Value.Message -contains "error") -and ($Result.Value.Message -notlike "*errorid*")) 
+if (($Result.Value.DisplayStatus | Select-Object -Unique) -ne 'Provisioning succeeded') 
 {
-    throw $($Error[0])
+    throw 'Failed to prepare VM Disks!'
     break
 }
 else
 {
-    Write-Host "PowerShell Job $($Result.Status)" -ForegroundColor Green
+    Write-Host "PowerShell Job $($Result.Value.DisplayStatus)" -ForegroundColor Green
     Write-Host "$($Result.Value.Message)" -ForegroundColor Green
     Write-Host "StartTime $($StartTime)" -ForegroundColor White
     Write-Host "EndTime $($EndTime)" -ForegroundColor White
-    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
+    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime - $StartTime)) -ForegroundColor White
     Write-Host ""
 }
 #endregion
@@ -816,7 +851,7 @@ Write-Host "Now I will install Active Directory & Certificate Services." -Foregr
 Write-Host "I will also create the Azure Stack Deployment Certificate Template." -ForegroundColor Yellow
 Write-host "This should take about 20 minutes." -ForegroundColor Yellow
 Write-Host ""
-$StartTime = Get-Date
+$StartTime = (Get-Date)
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
@@ -825,7 +860,7 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
 
 $ScriptString = @'
 #Configure AD CS
-Start-Transcript -Path "C:\logs\ConfigureADCS.txt" -NoClobber -Force
+
 $VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
 
 $Username = '.\Administrator'
@@ -842,10 +877,27 @@ Install-ADDSForest -DomainName "contoso.local" `
     -DomainNetbiosName Contoso -Force
 }
 
-Start-Sleep -Seconds 300
+Start-Sleep -Seconds 120
+
+winrm s winrm/config/client '@{TrustedHosts="*"}'
+
+do
+{
+    $ADTest = Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {Get-Service -Name 'ADWS'}
+}
+until ($ADTest.Status -eq 'Running')
+
+do
+{
+    $ADTest = Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {& NETDOM QUERY /D:contoso.local PDC}
+}
+until ($ADTest -contains "AD-01.contoso.local")
 
 Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {Install-WindowsFeature ADCS-Cert-Authority} -Verbose
 Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {Install-WindowsFeature RSAT-ADCS-Mgmt} -Verbose
+
+Start-Sleep -Seconds 10
+
 Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
     $params = @{
         CAType              = 'EnterpriseRootCa'
@@ -855,10 +907,10 @@ Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
         ValidityPeriod      = 'Years'
         ValidityPeriodUnits = '3'
     }
-    Install-AdcsCertificationAuthority @params -Force
-}
+    Install-AdcsCertificationAuthority @params -Force -Verbose
+} -Verbose
 
-Start-Sleep -Seconds 120
+Start-Sleep -Seconds 30
 
 Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
 $domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
@@ -940,7 +992,6 @@ $ace = [System.DirectoryServices.ActiveDirectoryAccessRule]::new(
 $templateDE.ObjectSecurity.AddAccessRule($ace)
 $templateDE.CommitChanges()
 $templateDE.Dispose()
-Start-Sleep -Seconds 200
 } -Verbose
 
 winrm s winrm/config/client '@{TrustedHosts="*"}'
@@ -954,8 +1005,6 @@ Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
     Expand-Archive -Path "C:\HubModules.zip" -DestinationPath "$env:ProgramFiles\WindowsPowerShell\Modules" -Force
     Expand-Archive -Path "C:\Scripts.zip" -DestinationPath "C:\Scripts" -Force
 }
-
-Stop-Transcript
 '@
 
     $ScriptString = $ScriptString.Replace('[AdminPassword]',"$AdminPassword")
@@ -963,35 +1012,34 @@ Stop-Transcript
     Invoke-AzVMRunCommand -VMName $VirtualMachineName `
         -ResourceGroupName $LabResourceGroup.ResourceGroupName `
         -CommandId 'RunPowerShellScript' `
-        -ScriptString $ScriptString -AsJob
+        -ScriptString $ScriptString -AsJob | Out-Null
 }
 
-$EndTime = Get-Date
 $Result = Get-Job | Wait-Job | Receive-Job
+$EndTime = (Get-Date)
 
-if (($Result.Value.Message -contains "error") -and ($Result.Value.Message -notlike "*errorid*")) 
+if (($Result.Value.DisplayStatus | Select-Object -Unique) -ne 'Provisioning succeeded') 
 {
-    throw $($Error[0])
+    throw 'Failed to prepare VM Disks!'
     break
 }
 else
 {
-    Write-Host "PowerShell Job $($Result.Status)" -ForegroundColor Green
+    Write-Host "PowerShell Job $($Result.Value.DisplayStatus)" -ForegroundColor Green
     Write-Host "$($Result.Value.Message)" -ForegroundColor Green
     Write-Host "StartTime $($StartTime)" -ForegroundColor White
     Write-Host "EndTime $($EndTime)" -ForegroundColor White
-    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
+    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime - $StartTime)) -ForegroundColor White
     Write-Host ""
 }
 #endregion
 
 #region Make the Azure Stack Certificate Template available and join ADFS to the Domain
-$NowTime = Get-Date
 Write-Host "Now I am going to make the Azure Stack Certificate Template available and join ADFS to the Domain." -ForegroundColor Yellow
 Write-Host "This should take less than 4 minutes." -ForegroundColor Yellow
-Write-Host $('Calm Down! It has only been like {0:mm} minutes since we started this script. It is getting there.' -f ($NowTime - $ScriptStartTime)) -ForegroundColor Yellow
+Write-Host $('Calm Down! It has only been like {0:mm} minutes since we started this script. It is getting there.' -f ((Get-Date) - $ScriptStartTime)) -ForegroundColor Yellow
 Write-Host ""
-$StartTime = Get-Date
+$StartTime = (Get-Date)
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
@@ -1000,7 +1048,6 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
 
 $ScriptString = @'
 #Configure AD CS
-Start-Transcript -Path "C:\logs\CertTemplateDomainJoin.txt" -NoClobber -Force
 $VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
 
 $Username = '.\Administrator'
@@ -1009,21 +1056,54 @@ $LocalCredential = New-Object System.Management.Automation.PSCredential($Usernam
 $Username = 'Contoso\Administrator'
 $DomainCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
 
-Restart-VM -Name 'AD-01' -Force -Wait
-Start-Sleep -Seconds 30
+Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
+$domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
+$pdc = $domain.PdcRoleOwner.Name
+$rootDSE = [adsi]"LDAP://$pdc/rootdse"
+
+# distinguishedName where the certificate templates are stored in AD
+$certificateTemplatesBaseDN = "CN=Certificate Templates,CN=Public Key Services,CN=Services,$($rootDSE.configurationNamingContext)"
+$certificateTemplatesBaseDE = [adsi]"LDAP://$pdc/$certificateTemplatesBaseDN"
+
+$templates = $certificateTemplatesBaseDE| select -ExpandProperty Children
+
+if ($templates.distinguishedName -contains "CN=AzureStack,CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,DC=contoso,DC=local")
+{
+    Add-CATemplate -Name 'AzureStack' -force
+}
+else
+{
+    do
+    {
+        Stop-Service CertSvc
+
+        Start-Sleep -Seconds 5
+
+        Start-Service CertSvc
+
+        Start-Sleep -Seconds 5
+
+        $domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
+        $pdc = $domain.PdcRoleOwner.Name
+        $rootDSE = [adsi]"LDAP://$pdc/rootdse"
+
+        # distinguishedName where the certificate templates are stored in AD
+        $certificateTemplatesBaseDN = "CN=Certificate Templates,CN=Public Key Services,CN=Services,$($rootDSE.configurationNamingContext)"
+        $certificateTemplatesBaseDE = [adsi]"LDAP://$pdc/$certificateTemplatesBaseDN"
+
+        $templates = $certificateTemplatesBaseDE| select -ExpandProperty Children
+    }
+    Until (($templates.distinguishedName -contains "CN=AzureStack,CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,DC=contoso,DC=local"))
+
+    Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {Add-CATemplate -Name "AzureStack" -Force} -Verbose -ErrorAction 'Stop'
+}
+}
+
 Restart-VM -Name 'ADFS-01' -Force -Wait
-Start-Sleep -Seconds 30
-
-$ADSession = New-PSSession -ComputerName '10.100.100.10' -Credential $DomainCredential
-
-Invoke-Command -Session $ADSession -ScriptBlock {Add-CATemplate -Name "AzureStack" -Force} -Verbose -ErrorAction 'Stop'
-
 Start-Sleep -Seconds 30
 
 # Configure ADFS
 Invoke-Command -VMName 'ADFS-01' -Credential $LocalCredential -ScriptBlock {Add-Computer -DomainName 'Contoso.local' -Credential $Using:DomainCredential -Restart} -Verbose -ErrorAction 'Stop'
-
-Stop-Transcript
 '@
 
     $ScriptString = $ScriptString.Replace('[AdminPassword]',"$AdminPassword")
@@ -1031,24 +1111,28 @@ Stop-Transcript
     Invoke-AzVMRunCommand -VMName $VirtualMachineName `
         -ResourceGroupName $LabResourceGroup.ResourceGroupName `
         -CommandId 'RunPowerShellScript' `
-        -ScriptString $ScriptString -AsJob
+        -ScriptString $ScriptString -AsJob | Out-Null
 }
 
-$EndTime = Get-Date
 $Result = Get-Job | Wait-Job | Receive-Job
+$EndTime = (Get-Date)
 
-if (($Result.Value.Message -contains "error") -and ($Result.Value.Message -notlike "*errorid*")) 
+$Result.Value.Message | Out-File "$env:temp\temp.txt"
+$Results = Get-Content "$env:temp\temp.txt"
+
+if ((($Results |  Select-String -Pattern 'template does not exist in the domain' | Select-Object -Unique) -replace '\s','') -eq 'The"AzureStack"templatedoesnotexistinthedomain.')
 {
-    throw $($Error[0])
+    throw 'Failed to add the Azure Stack Template'
     break
 }
+
 else
 {
     Write-Host "PowerShell Job $($Result.Status)" -ForegroundColor Green
     Write-Host "$($Result.Value.Message)" -ForegroundColor Green
     Write-Host "StartTime $($StartTime)" -ForegroundColor White
     Write-Host "EndTime $($EndTime)" -ForegroundColor White
-    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
+    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime - $StartTime)) -ForegroundColor White
     Write-Host ""
 }
 #endregion
@@ -1057,7 +1141,7 @@ else
 Write-Host "Now we are getting close. Just a few more things to take care of..." -ForegroundColor Yellow
 Write-Host "I need to generate the Azure Stack Deployment Certificates." -ForegroundColor Yellow
 Write-Host ""
-$StartTime = Get-Date
+$StartTime = (Get-Date)
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
@@ -1137,11 +1221,11 @@ ConvertTo-AzsPFX -Path $CERPath -pfxPassword $PFXPassword -ExportPath $PFXExport
     Invoke-AzVMRunCommand -VMName $VirtualMachineName `
         -ResourceGroupName $LabResourceGroup.ResourceGroupName `
         -CommandId 'RunPowerShellScript' `
-        -ScriptString $ScriptString -AsJob
+        -ScriptString $ScriptString -AsJob | Out-Null
 }
 
-$EndTime = Get-Date
 $Result = Get-Job | Wait-Job | Receive-Job
+$EndTime = (Get-Date)
 
 if (($Result.Value.Message -contains "error") -and ($Result.Value.Message -notlike "*errorid*")) 
 {
@@ -1154,7 +1238,7 @@ else
     Write-Host "$($Result.Value.Message)" -ForegroundColor Green
     Write-Host "StartTime $($StartTime)" -ForegroundColor White
     Write-Host "EndTime $($EndTime)" -ForegroundColor White
-    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
+    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime - $StartTime)) -ForegroundColor White
     Write-Host ""
 }
 #endregion
@@ -1163,7 +1247,7 @@ else
 Write-Host "Going to use PowerShell Remoting to copy the certificate files from the CA to the Setup Folder." -ForegroundColor Yellow
 Write-Host "Only 6 more steps. It is sooooo close now!" -ForegroundColor Yellow
 Write-Host ""
-$StartTime = Get-Date
+$StartTime = (Get-Date)
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
@@ -1187,24 +1271,24 @@ Remove-PSSession $ADSession
     Invoke-AzVMRunCommand -VMName $VirtualMachineName `
         -ResourceGroupName $LabResourceGroup.ResourceGroupName `
         -CommandId 'RunPowerShellScript' `
-        -ScriptString $ScriptString -AsJob
+        -ScriptString $ScriptString -AsJob | Out-Null
 }
 
-$EndTime = Get-Date
 $Result = Get-Job | Wait-Job | Receive-Job
+$EndTime = (Get-Date)
 
-if (($Result.Value.Message -contains "error") -and ($Result.Value.Message -notlike "*errorid*")) 
+if (($Result.Value.DisplayStatus | Select-Object -Unique) -ne 'Provisioning succeeded') 
 {
-    throw $($Error[0])
+    throw 'Failed to Copy Deployment Certificates!'
     break
 }
 else
 {
-    Write-Host "PowerShell Job $($Result.Status)" -ForegroundColor Green
+    Write-Host "PowerShell Job $($Result.Value.DisplayStatus)" -ForegroundColor Green
     Write-Host "$($Result.Value.Message)" -ForegroundColor Green
     Write-Host "StartTime $($StartTime)" -ForegroundColor White
     Write-Host "EndTime $($EndTime)" -ForegroundColor White
-    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
+    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime - $StartTime)) -ForegroundColor White
     Write-Host ""
 }
 #endregion
@@ -1213,7 +1297,7 @@ else
 Write-Host "I need to replace the Azure Stack Deployment Script with one I made just for you!" -ForegroundColor Yellow
 Write-Host "Do you feel special now?" -ForegroundColor Yellow
 Write-Host ""
-$StartTime = Get-Date
+$StartTime = (Get-Date)
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
@@ -1514,24 +1598,24 @@ Add-Content -Path `$InstallScript.FullName -Value `$InstallAzureStackPOCScript -
     Invoke-AzVMRunCommand -VMName $VirtualMachineName `
         -ResourceGroupName $LabResourceGroup.ResourceGroupName `
         -CommandId 'RunPowerShellScript' `
-        -ScriptString $ScriptString -AsJob
+        -ScriptString $ScriptString -AsJob | Out-Null
 }
 
-$EndTime = Get-Date
 $Result = Get-Job | Wait-Job | Receive-Job
+$EndTime = (Get-Date)
 
-if (($Result.Value.Message -contains "error") -and ($Result.Value.Message -notlike "*errorid*")) 
+if (($Result.Value.DisplayStatus | Select-Object -Unique) -ne 'Provisioning succeeded') 
 {
-    throw $($Error[0])
+    throw 'Failed to Create Azure Stack Deployment Script!'
     break
 }
 else
 {
-    Write-Host "PowerShell Job $($Result.Status)" -ForegroundColor Green
+    Write-Host "PowerShell Job $($Result.Value.DisplayStatus)" -ForegroundColor Green
     Write-Host "$($Result.Value.Message)" -ForegroundColor Green
     Write-Host "StartTime $($StartTime)" -ForegroundColor White
     Write-Host "EndTime $($EndTime)" -ForegroundColor White
-    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
+    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime - $StartTime)) -ForegroundColor White
     Write-Host ""
 }
 #endregion
@@ -1539,7 +1623,7 @@ else
 #region Remove Hyper-V Virtual Machines
 Write-Host "Only 4 more steps. Only a few more to go!" -ForegroundColor Yellow
 Write-Host ""
-$StartTime = Get-Date
+$StartTime = (Get-Date)
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
@@ -1555,24 +1639,24 @@ Get-NetAdapter | Where-Object {$_.Name -like "*ADSwitch*"} | Disable-NetAdapter 
     Invoke-AzVMRunCommand -VMName $VirtualMachineName `
         -ResourceGroupName $LabResourceGroup.ResourceGroupName `
         -CommandId 'RunPowerShellScript' `
-        -ScriptString $ScriptString -AsJob
+        -ScriptString $ScriptString -AsJob | Out-Null
 }
 
-$EndTime = Get-Date
 $Result = Get-Job | Wait-Job | Receive-Job
+$EndTime = (Get-Date)
 
-if (($Result.Value.Message -contains "error") -and ($Result.Value.Message -notlike "*errorid*")) 
+if (($Result.Value.DisplayStatus | Select-Object -Unique) -ne 'Provisioning succeeded') 
 {
-    throw $($Error[0])
+    throw 'Failed to remove the Domain Controller or ADFS Server!'
     break
 }
 else
 {
-    Write-Host "PowerShell Job $($Result.Status)" -ForegroundColor Green
+    Write-Host "PowerShell Job $($Result.Value.DisplayStatus)" -ForegroundColor Green
     Write-Host "$($Result.Value.Message)" -ForegroundColor Green
     Write-Host "StartTime $($StartTime)" -ForegroundColor White
     Write-Host "EndTime $($EndTime)" -ForegroundColor White
-    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
+    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime - $StartTime)) -ForegroundColor White
     Write-Host ""
 }
 #endregion
@@ -1580,7 +1664,7 @@ else
 #region Setup ASDK Install Job
 Write-Host "Only 2 more step after this! hang in there buddy..." -ForegroundColor Yellow
 Write-Host ""
-$StartTime = Get-Date
+$StartTime = (Get-Date)
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
@@ -1627,24 +1711,24 @@ Register-ScheduledTask @registrationParams -User "`$env:ComputerName\Administrat
     Invoke-AzVMRunCommand -VMName $VirtualMachineName `
         -ResourceGroupName $LabResourceGroup.ResourceGroupName `
         -CommandId 'RunPowerShellScript' `
-        -ScriptString $ScriptString -AsJob
+        -ScriptString $ScriptString -AsJob | Out-Null
 }
 
-$EndTime = Get-Date
 $Result = Get-Job | Wait-Job | Receive-Job
+$EndTime = (Get-Date)
 
-if (($Result.Value.Message -contains "error") -and ($Result.Value.Message -notlike "*errorid*")) 
+if (($Result.Value.DisplayStatus | Select-Object -Unique) -ne 'Provisioning succeeded') 
 {
-    throw $($Error[0])
+    throw 'Failed to Setup ASDK Install Job!'
     break
 }
 else
 {
-    Write-Host "PowerShell Job $($Result.Status)" -ForegroundColor Green
+    Write-Host "PowerShell Job $($Result.Value.DisplayStatus)" -ForegroundColor Green
     Write-Host "$($Result.Value.Message)" -ForegroundColor Green
     Write-Host "StartTime $($StartTime)" -ForegroundColor White
     Write-Host "EndTime $($EndTime)" -ForegroundColor White
-    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
+    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime - $StartTime)) -ForegroundColor White
     Write-Host ""
 }
 #endregion
@@ -1652,7 +1736,7 @@ else
 #region Create Script to Finalize the Install
 Write-Host "Just need to drop a script on the C Drive for you to use later." -ForegroundColor Yellow
 Write-Host ""
-$StartTime = Get-Date
+$StartTime = (Get-Date)
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
@@ -1715,24 +1799,24 @@ Add-Content -Path `$PostInstallScript.FullName -Value `$FinalizeAzureStackPOCScr
     Invoke-AzVMRunCommand -VMName $VirtualMachineName `
         -ResourceGroupName $LabResourceGroup.ResourceGroupName `
         -CommandId 'RunPowerShellScript' `
-        -ScriptString $ScriptString -AsJob
+        -ScriptString $ScriptString -AsJob | Out-Null
 }
 
-$EndTime = Get-Date
 $Result = Get-Job | Wait-Job | Receive-Job
+$EndTime = (Get-Date)
 
-if (($Result.Value.Message -contains "error") -and ($Result.Value.Message -notlike "*errorid*")) 
+if (($Result.Value.DisplayStatus | Select-Object -Unique) -ne 'Provisioning succeeded') 
 {
-    throw $($Error[0])
+    throw 'Failed to Create Script to Finalize the Install!'
     break
 }
 else
 {
-    Write-Host "PowerShell Job $($Result.Status)" -ForegroundColor Green
+    Write-Host "PowerShell Job $($Result.Value.DisplayStatus)" -ForegroundColor Green
     Write-Host "$($Result.Value.Message)" -ForegroundColor Green
     Write-Host "StartTime $($StartTime)" -ForegroundColor White
     Write-Host "EndTime $($EndTime)" -ForegroundColor White
-    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
+    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime - $StartTime)) -ForegroundColor White
     Write-Host ""
 }
 #endregion
@@ -1741,57 +1825,44 @@ else
 Write-host "Now I need to restart the Virtual Machines." -ForegroundColor Yellow
 Write-host "This can take up to 5 minutes. Please wait..." -ForegroundColor Yellow
 Write-Host ""
-$StartTime = Get-Date
+$StartTime = (Get-Date)
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
     Write-host "$($VirtualMachineName) - Restarting Virtual Machine." -ForegroundColor Green
 
-    Restart-AzVM -ResourceGroupName $LabResourceGroup.ResourceGroupName -Name $VirtualMachineName -AsJob
+    Restart-AzVM -ResourceGroupName $LabResourceGroup.ResourceGroupName -Name $VirtualMachineName -AsJob | Out-Null
 }
 
-$EndTime = Get-Date
 $Result = Get-Job | Wait-Job | Receive-Job
 
-if (($Result.Value.Message -contains "error") -and ($Result.Value.Message -notlike "*errorid*")) 
+foreach ($PublicIP in $DataTable.Rows.PublicIP)
 {
-    throw $($Error[0])
+    do 
+    {
+        $RDPTest = Test-NetConnection -ComputerName $PublicIP -Port 3389
+    }
+    until ($RDPTest.TcpTestSucceeded -eq $true)
+}
+
+$EndTime = (Get-Date)
+
+if ($Result.Status -ne 'Succeeded') 
+{
+    throw 'Virtual Machines Failed to Restart'
     break
 }
 else
 {
     Write-Host "PowerShell Job $($Result.Status)" -ForegroundColor Green
-    Write-Host "$($Result.Value.Message)" -ForegroundColor Green
     Write-Host "StartTime $($StartTime)" -ForegroundColor White
     Write-Host "EndTime $($EndTime)" -ForegroundColor White
-    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime-$StartTime)) -ForegroundColor White
+    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime - $StartTime)) -ForegroundColor White
     Write-Host ""
 }
 #endregion
 
-#region Export VM Information to Users Documents folder
-$DataTable = New-Object System.Data.DataTable
-$DataTable.Columns.Add("VMName","string") | Out-Null
-$DataTable.Columns.Add("PublicIP","string") | Out-Null
-
-foreach ($DeployedVirtualMachine in $DeployedVirtualMachines)
-{
-    $VM = Get-AzVM -ResourceGroupName $LabResourceGroup.ResourceGroupName -Name $DeployedVirtualMachine
-    $NIC = $VM.NetworkProfile.NetworkInterfaces[0].Id.Split('/') | Select-Object -Last 1
-    $PublicIPName =  (Get-AzNetworkInterface -ResourceGroupName $LabResourceGroup.ResourceGroupName -Name $NIC).IpConfigurations.PublicIpAddress.Id.Split('/') | Select-Object -Last 1
-    $PublicIIAddress = (Get-AzPublicIpAddress -ResourceGroupName $LabResourceGroup.ResourceGroupName -Name $PublicIPName).IpAddress
-
-    $NewRow = $DataTable.NewRow()
-    $NewRow.VMName = $($DeployedVirtualMachine)
-    $NewRow.PublicIP = $($PublicIIAddress)
-    $DataTable.Rows.Add($NewRow)
-}
-
-$CSVFileName = $($LabResourceGroup.ResourceGroupName) + '-DeployedVMs-' + $(Get-Date -f yyyy-MM-dd) + '.csv'
-$DataTable | Export-Csv "$ENV:UserProfile\Documents\$CSVFileName" -NoTypeInformation
-#endregion
-
-$ScriptEndTime = Get-Date
+$ScriptEndTime = (Get-Date)
 
 Write-Host "Deployment Jobs are complete." -ForegroundColor Green
 Write-Host $('Total Duration: {0:mm} min {0:ss} sec' -f ($ScriptEndTime-$ScriptStartTime)) -ForegroundColor Yellow
