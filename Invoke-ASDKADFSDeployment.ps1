@@ -846,10 +846,9 @@ else
 }
 #endregion
 
-#region Install Active Directory and Configure Certificate Services
-Write-Host "Now I will install Active Directory & Certificate Services." -ForegroundColor Yellow
-Write-Host "I will also create the Azure Stack Deployment Certificate Template." -ForegroundColor Yellow
-Write-host "This should take about 20 minutes." -ForegroundColor Yellow
+#region Install Active Directory
+Write-Host "Now I will install Active Directory" -ForegroundColor Yellow
+Write-host "This should take about 15 minutes." -ForegroundColor Yellow
 Write-Host ""
 $StartTime = (Get-Date)
 
@@ -859,7 +858,7 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
     Write-Host ""
 
 $ScriptString = @'
-#Configure AD CS
+#Configure AD
 
 $VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
 
@@ -893,107 +892,51 @@ do
 }
 until ($ADTest -contains "AD-01.contoso.local")
 
-Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {Install-WindowsFeature ADCS-Cert-Authority} -Verbose
-Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {Install-WindowsFeature RSAT-ADCS-Mgmt} -Verbose
+'@
 
-Start-Sleep -Seconds 10
+    $ScriptString = $ScriptString.Replace('[AdminPassword]',"$AdminPassword")
 
-Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
-    $params = @{
-        CAType              = 'EnterpriseRootCa'
-        CryptoProviderName  = 'RSA#Microsoft Software Key Storage Provider'
-        KeyLength           = '4096'
-        HashAlgorithmName   = 'SHA256'
-        ValidityPeriod      = 'Years'
-        ValidityPeriodUnits = '3'
-    }
-    Install-AdcsCertificationAuthority @params -Force -Verbose
-    Restart-Computer -ComputerName LocalHost -Force -Wait 0
-} -Verbose
+    Invoke-AzVMRunCommand -VMName $VirtualMachineName `
+        -ResourceGroupName $LabResourceGroup.ResourceGroupName `
+        -CommandId 'RunPowerShellScript' `
+        -ScriptString $ScriptString -AsJob | Out-Null
+}
 
-Start-Sleep -Seconds 200
+$Result = Get-Job | Wait-Job | Receive-Job
+$EndTime = (Get-Date)
 
-Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
-$domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
-$pdc = $domain.PdcRoleOwner.Name
-$rootDSE = [adsi]"LDAP://$pdc/rootdse"
+if (($Result.Value.DisplayStatus | Select-Object -Unique) -ne 'Provisioning succeeded') 
+{
+    throw 'Failed to prepare VM Disks!'
+    break
+}
+else
+{
+    Write-Host "PowerShell Job $($Result.Value.DisplayStatus)" -ForegroundColor Green
+    Write-Host "$($Result.Value.Message)" -ForegroundColor Green
+    Write-Host "StartTime $($StartTime)" -ForegroundColor White
+    Write-Host "EndTime $($EndTime)" -ForegroundColor White
+    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime - $StartTime)) -ForegroundColor White
+    Write-Host ""
+}
+#endregion
 
-# distinguishedName where the certificate templates are stored in AD
-$certificateTemplatesBaseDN = "CN=Certificate Templates,CN=Public Key Services,CN=Services,$($rootDSE.configurationNamingContext)"
-$certificateTemplatesBaseDE = [adsi]"LDAP://$pdc/$certificateTemplatesBaseDN"
-$templateName = 'AzureStack'
+#region Install Certificate Services
+Write-Host "Now I will install Certificate Services." -ForegroundColor Yellow
+Write-host "This should take about 20 minutes." -ForegroundColor Yellow
+Write-Host ""
+$StartTime = (Get-Date)
 
-# Create  DirectoryEntry for the new template
-$templateDE = $certificateTemplatesBaseDE.Children.Add("CN=$templateName", "pKICertificateTemplate")
+foreach ($VirtualMachineName in $DeployedVirtualMachines)
+{
+    Write-Host "$($VirtualMachineName) - Installing Active Directory and Certificate Services" -ForegroundColor Green
+    Write-Host ""
 
-# Set property values
-$templateDE.Properties["displayname"].Value = 'Azure Stack'
-$templateDE.Properties["flags"].Value = 131649
-$templateDE.Properties["pKICriticalExtensions"].Value = "2.5.29.15"
-$templateDE.Properties["pKIDefaultCSPs"].Value = @("1,Microsoft RSA SChannel Cryptographic Provider", "2,Microsoft DH SChannel Cryptographic Provider")
-$templateDE.Properties["pKIDefaultKeySpec"].Value = 1
+$ScriptString = @'
+$VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
 
-# EKU for both server and client auth
-$templateDE.Properties["pKIExtendedKeyUsage"].Value = @("1.3.6.1.5.5.7.3.1", "1.3.6.1.5.5.7.3.2")
-# XCN_CERT_DIGITAL_SIGNATURE_KEY_USAGE + XCN_CERT_KEY_ENCIPHERMENT_KEY_USAGE
-$templateDE.Properties["pKIKeyUsage"].Value = [byte[]]@(160, 0)
-
-# 10 year validity
-$expirationTimespan = [TimeSpan]::FromDays(365 * 10)
-$templateDE.Properties["pKIExpirationPeriod"].Value = [System.BitConverter]::GetBytes($expirationTimespan.Negate().Ticks)
-# Allow renewal 6 weeks before expiration
-$overlapTimespan = [TimeSpan]::FromDays(7 * 6)
-$templateDE.Properties["pKIOverlapPeriod"].Value = [System.BitConverter]::GetBytes($overlapTimespan.Negate().Ticks)
-
-$templateDE.Properties["pKIMaxIssuingDepth"].Value = 0
-$templateDE.Properties["msPKI-Cert-Template-OID"].Value = "1.3.6.1.4.1.311.21.8.7638725.13898300.1985460.3383425.7519116.119.16408497.1716293"
-$templateDE.Properties["msPKI-Certificate-Application-Policy"].Value = @("1.3.6.1.5.5.7.3.1", "1.3.6.1.5.5.7.3.2")
-$templateDE.Properties["msPKI-Certificate-Name-Flag"].Value = 1
-$templateDE.Properties["msPKI-Enrollment-Flag"].Value = 0
-$templateDE.Properties["msPKI-Minimal-Key-Size"].Value = 2048
-$templateDE.Properties["msPKI-Private-Key-Flag"].Value = 16842768
-$templateDE.Properties["msPKI-RA-Signature"].Value = 0
-$templateDE.Properties["msPKI-Template-Minor-Revision"].Value = 0
-$templateDE.Properties["msPKI-Template-Schema-Version"].Value = 2
-$templateDE.Properties["revision"].Value = 100
-$templateDE.CommitChanges()
-$templateDE.RefreshCache()
-
-Start-Sleep -Seconds 30
-
-$GroupToAdd = 'Contoso\Domain Computers'
-
-$domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
-$pdc = $domain.PdcRoleOwner.Name
-$rootDSE = [adsi]"LDAP://$pdc/rootdse"
-$certificateTemplatesDE = [adsi]"LDAP://CN=Certificate Templates,CN=Public Key Services,CN=Services,$($rootDSE.configurationNamingContext)"
-
-# values we want present in the ACL
-$actor = ([System.Security.Principal.NTAccount]$GroupToAdd).Translate([System.Security.Principal.SecurityIdentifier])
-$right = [System.DirectoryServices.ActiveDirectoryRights]::ExtendedRight
-$accessControlType = [System.Security.AccessControl.AccessControlType]::Allow
-$objectType = [System.Guid]"0e10c968-78fb-11d2-90d4-00c04f79dc55"
-$inheritanceFlags = [System.DirectoryServices.ActiveDirectorySecurityInheritance]::None
-$templateDE = $certificateTemplatesDE.Children | Where-Object {$_.distinguishedName -like "CN=AzureStack*"}
-
-$ace = [System.DirectoryServices.ActiveDirectoryAccessRule]::new(
-    $actor,
-    [System.DirectoryServices.ActiveDirectoryRights]"GenericRead",
-    $accessControlType)
-$templateDE.ObjectSecurity.AddAccessRule($ace)
-$templateDE.CommitChanges()
-$templateDE.RefreshCache()
-
-$ace = [System.DirectoryServices.ActiveDirectoryAccessRule]::new(
-    $actor,
-    $right,
-    $accessControlType,
-    $objectType,
-    $inheritanceFlags)
-$templateDE.ObjectSecurity.AddAccessRule($ace)
-$templateDE.CommitChanges()
-$templateDE.Dispose()
-} -Verbose
+$Username = 'Contoso\Administrator'
+$DomainCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
 
 winrm s winrm/config/client '@{TrustedHosts="*"}'
 
@@ -1001,10 +944,73 @@ $ADSession = New-PSSession -ComputerName '10.100.100.10' -Credential $DomainCred
 
 Copy-Item E:\SetupFiles\software\HubModules.zip -Destination C:\ -ToSession $ADSession
 Copy-Item E:\SetupFiles\software\Scripts.zip -Destination C:\ -ToSession $ADSession
+Copy-Item E:\SetupFiles\DSC\Modules -Destination 'C:\Program Files\WindowsPowerShell' -Force -Recurse -ToSession $ADSession | Out-Null
+Copy-Item E:\SetupFiles\DSC\DSCConfigs -Destination 'C:\' -Force -Recurse -ToSession $ADSession | Out-Null
 
-Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
-    Expand-Archive -Path "C:\HubModules.zip" -DestinationPath "$env:ProgramFiles\WindowsPowerShell\Modules" -Force
-    Expand-Archive -Path "C:\Scripts.zip" -DestinationPath "C:\Scripts" -Force
+Invoke-Command -Session $ADSession -ScriptBlock {
+$VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
+
+$Username = 'Contoso\Administrator'
+$DomainCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
+
+$configFunc = "CaRootConfig"
+Set-Location 'C:\DSCConfigs'
+$scriptFilePathName = ".\CaRootConfig.ps1"
+Write-Verbose "Dot sourcing functions in PS1 script '$scriptFilePathName'"
+. $scriptFilePathName # load the DSC configuration functions into session
+
+$dscParameters = @{
+    Hostname = $ENV:Computername
+    Credential = $DomainCredential
+    CaCommonName = 'AD-01-CA' 
+    DomainDistinguishedName = 'CN=AD-01-CA,DC=Contoso,DC=local' 
+    DomainName = 'contoso.local'
+}
+
+$DscWorkPath = 'C:\DSCConfigs'
+$certificateFilePathName = Join-Path -Path $DscWorkPath -ChildPath "$(hostname).cer"
+$cert = Get-ChildItem -Path 'Cert:\LocalMachine\My' -DocumentEncryptionCert | Where-Object -FilterScript { $psItem.Subject -eq "DSC Document Encryption" }
+if ($null -eq $cert) 
+{
+    $cert = New-SelfSignedCertificate -Subject "DSC Document Encryption" -Type DocumentEncryptionCert -TextExtension "2.5.29.17={text}DNS=localhost" -CertStoreLocation Cert:\LocalMachine\My -ErrorAction Stop
+}
+$null = $cert | Export-Certificate -Type CERT -FilePath $certificateFilePathName -Force
+
+Configuration LcmSettings {
+    param(
+        [Parameter(Mandatory = $true)]
+        [Alias("Thumbprint")]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $CertificateId
+    )
+
+    node localhost {
+        LocalConfigurationManager {
+            ConfigurationMode = "ApplyOnly"
+            RebootNodeIfNeeded = $true
+            DebugMode = "ForceModuleImport"
+            CertificateId = $CertificateId
+        }
+    }
+}
+
+& LcmSettings -CertificateId $cert.Thumbprint -OutputPath $DscWorkPath -Verbose
+
+Set-DscLocalConfigurationManager -Path $DscWorkPath -Force -Verbose
+
+$commonConfigurationData = @{
+    AllNodes = @(
+        @{
+            NodeName = 'localhost'
+            PsDscAllowDomainUser = $true
+            CertificateFile = "$certificateFilePathName"
+            Thumbprint = "$($cert.Thumbprint)"
+        }
+    )
+}
+& $configFunc @dscParameters -ConfigurationData $commonConfigurationData -OutputPath $DscWorkPath
+Start-DscConfiguration -Path .\ -Force -Wait -Verbose
 }
 '@
 
@@ -1035,10 +1041,102 @@ else
 }
 #endregion
 
-#region Make the Azure Stack Certificate Template available and join ADFS to the Domain
-Write-Host "Now I am going to make the Azure Stack Certificate Template available and join ADFS to the Domain." -ForegroundColor Yellow
+#region Make the Azure Stack Certificate Template available
+Write-Host "Now I am going to make the Azure Stack Certificate Template available" -ForegroundColor Yellow
 Write-Host "This should take less than 4 minutes." -ForegroundColor Yellow
 Write-Host $('Calm Down! It has only been like {0:mm} minutes since we started this script. It is getting there.' -f ((Get-Date) - $ScriptStartTime)) -ForegroundColor Yellow
+Write-Host ""
+$StartTime = (Get-Date)
+
+foreach ($VirtualMachineName in $DeployedVirtualMachines)
+{
+    Write-Host "$($VirtualMachineName) - Making the Azure Stack Certificate Template available" -ForegroundColor Green
+    Write-Host ""
+
+$ScriptString = @'
+$VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
+
+$Username = '.\Administrator'
+$LocalCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
+
+$Username = 'Contoso\Administrator'
+$DomainCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
+
+Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
+    $domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
+    $pdc = $domain.PdcRoleOwner.Name
+    $rootDSE = [adsi]"LDAP://$pdc/rootdse"
+
+    # distinguishedName where the certificate templates are stored in AD
+    $certificateTemplatesBaseDN = "CN=Certificate Templates,CN=Public Key Services,CN=Services,$($rootDSE.configurationNamingContext)"
+    $certificateTemplatesBaseDE = [adsi]"LDAP://$pdc/$certificateTemplatesBaseDN"
+
+    $templates = $certificateTemplatesBaseDE| Select-Object -ExpandProperty Children
+
+    if ($templates.distinguishedName -contains "CN=AzureStack,CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,DC=contoso,DC=local")
+    {
+        Add-CATemplate -Name 'AzureStack' -force
+    }
+
+    else
+    {
+        do
+        {
+            Stop-Service CertSvc
+
+            Start-Sleep -Seconds 5
+
+            Start-Service CertSvc
+
+            Start-Sleep -Seconds 5
+
+            $domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
+            $pdc = $domain.PdcRoleOwner.Name
+            $rootDSE = [adsi]"LDAP://$pdc/rootdse"
+
+            # distinguishedName where the certificate templates are stored in AD
+            $certificateTemplatesBaseDN = "CN=Certificate Templates,CN=Public Key Services,CN=Services,$($rootDSE.configurationNamingContext)"
+            $certificateTemplatesBaseDE = [adsi]"LDAP://$pdc/$certificateTemplatesBaseDN"
+
+            $templates = $certificateTemplatesBaseDE| Select-Object -ExpandProperty Children
+        }
+        Until (($templates.distinguishedName -contains "CN=AzureStack,CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,DC=contoso,DC=local"))
+
+        Add-CATemplate -Name 'AzureStack' -force
+    }
+}
+'@
+
+    $ScriptString = $ScriptString.Replace('[AdminPassword]',"$AdminPassword")
+
+    Invoke-AzVMRunCommand -VMName $VirtualMachineName `
+        -ResourceGroupName $LabResourceGroup.ResourceGroupName `
+        -CommandId 'RunPowerShellScript' `
+        -ScriptString $ScriptString -AsJob | Out-Null
+}
+
+$Result = Get-Job | Wait-Job | Receive-Job
+$EndTime = (Get-Date)
+
+if (($Result.Value.DisplayStatus | Select-Object -Unique) -ne 'Provisioning succeeded') 
+{
+    throw 'Failed to prepare VM Disks!'
+    break
+}
+else
+{
+    Write-Host "PowerShell Job $($Result.Value.DisplayStatus)" -ForegroundColor Green
+    Write-Host "$($Result.Value.Message)" -ForegroundColor Green
+    Write-Host "StartTime $($StartTime)" -ForegroundColor White
+    Write-Host "EndTime $($EndTime)" -ForegroundColor White
+    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime - $StartTime)) -ForegroundColor White
+    Write-Host ""
+}
+#endregion
+
+#region Join ADFS to the Domain
+Write-Host "Now I am going to join ADFS-01 to the Domain." -ForegroundColor Yellow
+Write-Host "This should take less than 4 minutes." -ForegroundColor Yellow
 Write-Host ""
 $StartTime = (Get-Date)
 
@@ -1057,51 +1155,13 @@ $LocalCredential = New-Object System.Management.Automation.PSCredential($Usernam
 $Username = 'Contoso\Administrator'
 $DomainCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
 
-Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
-$domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
-$pdc = $domain.PdcRoleOwner.Name
-$rootDSE = [adsi]"LDAP://$pdc/rootdse"
-
-# distinguishedName where the certificate templates are stored in AD
-$certificateTemplatesBaseDN = "CN=Certificate Templates,CN=Public Key Services,CN=Services,$($rootDSE.configurationNamingContext)"
-$certificateTemplatesBaseDE = [adsi]"LDAP://$pdc/$certificateTemplatesBaseDN"
-
-$templates = $certificateTemplatesBaseDE| select -ExpandProperty Children
-
-if ($templates.distinguishedName -contains "CN=AzureStack,CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,DC=contoso,DC=local")
-{
-    Add-CATemplate -Name 'AzureStack' -force
-}
-else
-{
-    do
-    {
-        Stop-Service CertSvc
-
-        Start-Sleep -Seconds 5
-
-        Start-Service CertSvc
-
-        Start-Sleep -Seconds 5
-
-        $domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
-        $pdc = $domain.PdcRoleOwner.Name
-        $rootDSE = [adsi]"LDAP://$pdc/rootdse"
-
-        # distinguishedName where the certificate templates are stored in AD
-        $certificateTemplatesBaseDN = "CN=Certificate Templates,CN=Public Key Services,CN=Services,$($rootDSE.configurationNamingContext)"
-        $certificateTemplatesBaseDE = [adsi]"LDAP://$pdc/$certificateTemplatesBaseDN"
-
-        $templates = $certificateTemplatesBaseDE| select -ExpandProperty Children
-    }
-    Until (($templates.distinguishedName -contains "CN=AzureStack,CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,DC=contoso,DC=local"))
-
-    Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {Add-CATemplate -Name "AzureStack" -Force} -Verbose -ErrorAction 'Stop'
-}
-}
-
 Restart-VM -Name 'ADFS-01' -Force -Wait
-Start-Sleep -Seconds 30
+
+do 
+{
+    $RDPTest = Test-NetConnection -ComputerName 10.100.100.11 -Port 3389
+}
+until ($RDPTest.TcpTestSucceeded -eq $true)
 
 # Configure ADFS
 Invoke-Command -VMName 'ADFS-01' -Credential $LocalCredential -ScriptBlock {Add-Computer -DomainName 'Contoso.local' -Credential $Using:DomainCredential -Restart} -Verbose -ErrorAction 'Stop'
