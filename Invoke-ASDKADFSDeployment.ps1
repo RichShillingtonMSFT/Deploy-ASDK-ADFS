@@ -931,7 +931,7 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
     Write-Host "$($VirtualMachineName) - Installing Certificate Services" -ForegroundColor Green
     Write-Host ""
 
-    $ScriptString = @'
+$ScriptString = @'
     $VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
     
     $Username = 'Contoso\Administrator'
@@ -1168,7 +1168,7 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
         Throw $($Error.Exception)
         break
     }
-'@
+    '@
 $VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
 
 $Username = 'Contoso\Administrator'
