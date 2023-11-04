@@ -1025,7 +1025,7 @@ if ($ExceptionErrors -like "*You cannot call a method on a null-valued*")
 {
     $Error.Clear()
     Get-VM -Name AD-01 | Restart-VM -Force
-    Start-Sleep -Seconds 120
+    Start-Sleep -Seconds 240
     $ADSession = New-PSSession -ComputerName '10.100.100.10' -Credential $DomainCredential
 
     Invoke-Command -VMName AD-01 -Credential $DomainCredential -ScriptBlock {
@@ -1337,7 +1337,7 @@ if ($ExceptionErrors)
     $Error.Clear()
     $ADSession = New-PSSession -ComputerName '10.100.100.10' -Credential $DomainCredential
     Invoke-Command -Session $ADSession -ScriptBlock {Restart-Computer -Force -Wait 0}
-    Start-Sleep -Seconds 200
+    Start-Sleep -Seconds 240
     Invoke-Command -Session $ADSession -ScriptBlock {Add-CATemplate -Name 'AzureStack' -force}
 }
 
