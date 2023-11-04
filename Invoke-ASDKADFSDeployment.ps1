@@ -1231,7 +1231,8 @@ $LocalCredential = New-Object System.Management.Automation.PSCredential($Usernam
 $Username = 'Contoso\Administrator'
 $DomainCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
 
-Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
+Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock 
+{
     $domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
     $pdc = $domain.PdcRoleOwner.Name
     $rootDSE = [adsi]"LDAP://$pdc/rootdse"
@@ -1323,10 +1324,6 @@ Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
 
                 Add-CATemplate -Name 'AzureStack' -force
             }
-        }
-        else
-        {
-            Add-CATemplate -Name 'AzureStack' -force
         }
     }
 }
