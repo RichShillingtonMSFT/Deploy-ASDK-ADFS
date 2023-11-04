@@ -849,7 +849,7 @@ else
 
 #region Install Active Directory
 Write-Host "Now I will install Active Directory" -ForegroundColor Yellow
-Write-host "This should take about 15 minutes." -ForegroundColor Yellow
+Write-host "This should take about 10-15 minutes." -ForegroundColor Yellow
 Write-Host ""
 $StartTime = (Get-Date)
 
@@ -1026,7 +1026,7 @@ if ($ExceptionErrors -like "*You cannot call a method on a null-valued*")
     $ADSession = New-PSSession -ComputerName '10.100.100.10' -Credential $DomainCredential
 
     Invoke-Command -VMName AD-01 -Credential $DomainCredential -ScriptBlock {
-        $VirtualMachinePassword = ConvertTo-SecureString -String '' -AsPlainText -Force
+        $VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
     
         $Username = 'Contoso\Administrator'
         $DomainCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
