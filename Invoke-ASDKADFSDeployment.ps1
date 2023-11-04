@@ -1851,7 +1851,7 @@ else
 #endregion
 
 #region Remove Hyper-V Virtual Machines
-Write-Host "Only 4 more steps. Only a few more to go!" -ForegroundColor Yellow
+Write-Host "Only 4 more steps. Nearly there!" -ForegroundColor Yellow
 Write-Host ""
 $StartTime = (Get-Date)
 
@@ -1892,7 +1892,7 @@ else
 #endregion
 
 #region Setup ASDK Install Job
-Write-Host "Only 2 more step after this! hang in there buddy..." -ForegroundColor Yellow
+Write-Host "Only 2 more steps after this! hang in there buddy..." -ForegroundColor Yellow
 Write-Host ""
 $StartTime = (Get-Date)
 
@@ -2105,3 +2105,9 @@ Write-Host "$ENV:UserProfile\Documents\$CSVFileName" -ForegroundColor Green
 Write-Host ""
 Write-Host "Prior to Domain Setup completion, the login UserName will be .\Administrator" -ForegroundColor White
 Write-Host "Once the ASDK Domain Setup is complete, the login UserName will be AzureStack\AzureStackAdmin" -ForegroundColor White
+Write-Host ""
+Write-Host "When the Fabric install is done, run C:\FinalizeServers.ps1 from an elevated PowerShell Console." -ForegroundColor White
+Write-Host "That script will put the AD & ADFS VMs back so you can use them." -ForegroundColor White
+Write-Host ""
+Write-Host ""
+Write-Host "Have fun!!" -ForegroundColor White
