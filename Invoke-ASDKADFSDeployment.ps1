@@ -932,21 +932,22 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
     Write-Host ""
 
 $ScriptString = @'
-    $VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
+$VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
     
-    $Username = 'Contoso\Administrator'
-    $DomainCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
+$Username = 'Contoso\Administrator'
+$DomainCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
     
-    winrm s winrm/config/client '@{TrustedHosts="*"}'
+winrm s winrm/config/client '@{TrustedHosts="*"}'
     
-    $ADSession = New-PSSession -ComputerName '10.100.100.10' -Credential $DomainCredential
+$ADSession = New-PSSession -ComputerName '10.100.100.10' -Credential $DomainCredential
     
-    Copy-Item E:\SetupFiles\software\HubModules.zip -Destination C:\ -ToSession $ADSession
-    Copy-Item E:\SetupFiles\software\Scripts.zip -Destination C:\ -ToSession $ADSession
-    Copy-Item E:\SetupFiles\DSC\Modules -Destination 'C:\Program Files\WindowsPowerShell' -Force -Recurse -ToSession $ADSession | Out-Null
-    Copy-Item E:\SetupFiles\DSC\DSCConfigs -Destination 'C:\' -Force -Recurse -ToSession $ADSession | Out-Null
+Copy-Item E:\SetupFiles\software\HubModules.zip -Destination C:\ -ToSession $ADSession
+Copy-Item E:\SetupFiles\software\Scripts.zip -Destination C:\ -ToSession $ADSession
+Copy-Item E:\SetupFiles\DSC\Modules -Destination 'C:\Program Files\WindowsPowerShell' -Force -Recurse -ToSession $ADSession | Out-Null
+Copy-Item E:\SetupFiles\DSC\DSCConfigs -Destination 'C:\' -Force -Recurse -ToSession $ADSession | Out-Null
     
-    Invoke-Command -Session $ADSession -ScriptBlock {
+Invoke-Command -Session $ADSession -ScriptBlock {
+
     $VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
     
     $Username = 'Contoso\Administrator'
@@ -1008,267 +1009,35 @@ $ScriptString = @'
             }
         )
     }
+
     & $configFunc @dscParameters -ConfigurationData $commonConfigurationData -OutputPath $DscWorkPath
+
     Start-DscConfiguration -Path .\ -Force -Wait -Verbose
-    } -Verbose
-    
-    [String]$ExceptionErrors = $Error.Exception
-    
-    if ($ExceptionErrors -like "*You cannot call a method on a null-valued*")
-    {
-        $Error.Clear()
-        $ADSession = New-PSSession -ComputerName '10.100.100.10' -Credential $DomainCredential
-        Get-VM -Name AD-01 | Restart-VM -Force
-        Start-Sleep -Seconds 120
-        Invoke-Command -VMName AD-01 -Credential $DomainCredential -ScriptBlock {
-            $VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
-    
-            $Username = 'Contoso\Administrator'
-            $DomainCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
-    
-            $configFunc = "CaRootConfig"
-            Set-Location 'C:\DSCConfigs'
-            $scriptFilePathName = ".\CaRootConfig.ps1"
-            Write-Verbose "Dot sourcing functions in PS1 script '$scriptFilePathName'"
-            . $scriptFilePathName # load the DSC configuration functions into session
-    
-            $dscParameters = @{
-                Hostname = $ENV:Computername
-                Credential = $DomainCredential
-                CaCommonName = 'AD-01-CA' 
-                DomainDistinguishedName = 'CN=AD-01-CA,DC=Contoso,DC=local' 
-                DomainName = 'contoso.local'
-            }
-    
-            $DscWorkPath = 'C:\DSCConfigs'
-            $certificateFilePathName = Join-Path -Path $DscWorkPath -ChildPath "$(hostname).cer"
-            $cert = Get-ChildItem -Path 'Cert:\LocalMachine\My' -DocumentEncryptionCert | Where-Object -FilterScript { $psItem.Subject -eq "DSC Document Encryption" }
-            if ($null -eq $cert) 
-            {
-                $cert = New-SelfSignedCertificate -Subject "DSC Document Encryption" -Type DocumentEncryptionCert -TextExtension "2.5.29.17={text}DNS=localhost" -CertStoreLocation Cert:\LocalMachine\My -ErrorAction Stop
-            }
-            $null = $cert | Export-Certificate -Type CERT -FilePath $certificateFilePathName -Force
-    
-            Configuration LcmSettings {
-                param(
-                    [Parameter(Mandatory = $true)]
-                    [Alias("Thumbprint")]
-                    [ValidateNotNullOrEmpty()]
-                    [string]
-                    $CertificateId
-                )
-    
-                node localhost {
-                    LocalConfigurationManager {
-                        ConfigurationMode = "ApplyOnly"
-                        RebootNodeIfNeeded = $true
-                        DebugMode = "ForceModuleImport"
-                        CertificateId = $CertificateId
-                    }
-                }
-            }
-    
-            & LcmSettings -CertificateId $cert.Thumbprint -OutputPath $DscWorkPath -Verbose
-    
-            Set-DscLocalConfigurationManager -Path $DscWorkPath -Force -Verbose
-    
-            $commonConfigurationData = @{
-                AllNodes = @(
-                    @{
-                        NodeName = 'localhost'
-                        PsDscAllowDomainUser = $true
-                        CertificateFile = "$certificateFilePathName"
-                        Thumbprint = "$($cert.Thumbprint)"
-                    }
-                )
-            }
-            & $configFunc @dscParameters -ConfigurationData $commonConfigurationData -OutputPath $DscWorkPath
-            Start-DscConfiguration -Path .\ -Force -Wait -Verbose
-        } -Verbose
-    }
-    
-    [String]$ExceptionErrors = $Error.Exception
-    
-    if ($ExceptionErrors)
-    {
-        if ($ExceptionErrors -like "*Failed to start service `'Active Directory Certificate Services (certsvc)`'*")
-        {
-            Get-Service CertSvc | Start-Service
-            $Error.Clear()
-            Invoke-Command -Session $ADSession -ScriptBlock {
-                $VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
-    
-                $Username = 'Contoso\Administrator'
-                $DomainCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
-    
-                $configFunc = "CaRootConfig"
-                Set-Location 'C:\DSCConfigs'
-                $scriptFilePathName = ".\CaRootConfig.ps1"
-                Write-Verbose "Dot sourcing functions in PS1 script '$scriptFilePathName'"
-                . $scriptFilePathName # load the DSC configuration functions into session
-    
-                $dscParameters = @{
-                    Hostname = $ENV:Computername
-                    Credential = $DomainCredential
-                    CaCommonName = 'AD-01-CA' 
-                    DomainDistinguishedName = 'CN=AD-01-CA,DC=Contoso,DC=local' 
-                    DomainName = 'contoso.local'
-                }
-    
-                $DscWorkPath = 'C:\DSCConfigs'
-                $certificateFilePathName = Join-Path -Path $DscWorkPath -ChildPath "$(hostname).cer"
-                $cert = Get-ChildItem -Path 'Cert:\LocalMachine\My' -DocumentEncryptionCert | Where-Object -FilterScript { $psItem.Subject -eq "DSC Document Encryption" }
-                if ($null -eq $cert) 
-                {
-                    $cert = New-SelfSignedCertificate -Subject "DSC Document Encryption" -Type DocumentEncryptionCert -TextExtension "2.5.29.17={text}DNS=localhost" -CertStoreLocation Cert:\LocalMachine\My -ErrorAction Stop
-                }
-                $null = $cert | Export-Certificate -Type CERT -FilePath $certificateFilePathName -Force
-    
-                Configuration LcmSettings {
-                    param(
-                        [Parameter(Mandatory = $true)]
-                        [Alias("Thumbprint")]
-                        [ValidateNotNullOrEmpty()]
-                        [string]
-                        $CertificateId
-                    )
-    
-                    node localhost {
-                        LocalConfigurationManager {
-                            ConfigurationMode = "ApplyOnly"
-                            RebootNodeIfNeeded = $true
-                            DebugMode = "ForceModuleImport"
-                            CertificateId = $CertificateId
-                        }
-                    }
-                }
-    
-                & LcmSettings -CertificateId $cert.Thumbprint -OutputPath $DscWorkPath -Verbose
-    
-                Set-DscLocalConfigurationManager -Path $DscWorkPath -Force -Verbose
-    
-                $commonConfigurationData = @{
-                    AllNodes = @(
-                        @{
-                            NodeName = 'localhost'
-                            PsDscAllowDomainUser = $true
-                            CertificateFile = "$certificateFilePathName"
-                            Thumbprint = "$($cert.Thumbprint)"
-                        }
-                    )
-                }
-                & $configFunc @dscParameters -ConfigurationData $commonConfigurationData -OutputPath $DscWorkPath
-                Start-DscConfiguration -Path .\ -Force -Wait -Verbose
-            } -Verbose
-        }
-    }
-    
-    if ($Error)
-    {
-        Throw $($Error.Exception)
-        break
-    }
-    '@
-$VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
 
-$Username = 'Contoso\Administrator'
-$DomainCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
-
-winrm s winrm/config/client '@{TrustedHosts="*"}'
-
-$ADSession = New-PSSession -ComputerName '10.100.100.10' -Credential $DomainCredential
-
-Copy-Item E:\SetupFiles\software\HubModules.zip -Destination C:\ -ToSession $ADSession
-Copy-Item E:\SetupFiles\software\Scripts.zip -Destination C:\ -ToSession $ADSession
-Copy-Item E:\SetupFiles\DSC\Modules -Destination 'C:\Program Files\WindowsPowerShell' -Force -Recurse -ToSession $ADSession | Out-Null
-Copy-Item E:\SetupFiles\DSC\DSCConfigs -Destination 'C:\' -Force -Recurse -ToSession $ADSession | Out-Null
-
-Invoke-Command -Session $ADSession -ScriptBlock {
-$VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
-
-$Username = 'Contoso\Administrator'
-$DomainCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
-
-$configFunc = "CaRootConfig"
-Set-Location 'C:\DSCConfigs'
-$scriptFilePathName = ".\CaRootConfig.ps1"
-Write-Verbose "Dot sourcing functions in PS1 script '$scriptFilePathName'"
-. $scriptFilePathName # load the DSC configuration functions into session
-
-$dscParameters = @{
-    Hostname = $ENV:Computername
-    Credential = $DomainCredential
-    CaCommonName = 'AD-01-CA' 
-    DomainDistinguishedName = 'CN=AD-01-CA,DC=Contoso,DC=local' 
-    DomainName = 'contoso.local'
-}
-
-$DscWorkPath = 'C:\DSCConfigs'
-$certificateFilePathName = Join-Path -Path $DscWorkPath -ChildPath "$(hostname).cer"
-$cert = Get-ChildItem -Path 'Cert:\LocalMachine\My' -DocumentEncryptionCert | Where-Object -FilterScript { $psItem.Subject -eq "DSC Document Encryption" }
-if ($null -eq $cert) 
-{
-    $cert = New-SelfSignedCertificate -Subject "DSC Document Encryption" -Type DocumentEncryptionCert -TextExtension "2.5.29.17={text}DNS=localhost" -CertStoreLocation Cert:\LocalMachine\My -ErrorAction Stop
-}
-$null = $cert | Export-Certificate -Type CERT -FilePath $certificateFilePathName -Force
-
-Configuration LcmSettings {
-    param(
-        [Parameter(Mandatory = $true)]
-        [Alias("Thumbprint")]
-        [ValidateNotNullOrEmpty()]
-        [string]
-        $CertificateId
-    )
-
-    node localhost {
-        LocalConfigurationManager {
-            ConfigurationMode = "ApplyOnly"
-            RebootNodeIfNeeded = $true
-            DebugMode = "ForceModuleImport"
-            CertificateId = $CertificateId
-        }
-    }
-}
-
-& LcmSettings -CertificateId $cert.Thumbprint -OutputPath $DscWorkPath -Verbose
-
-Set-DscLocalConfigurationManager -Path $DscWorkPath -Force -Verbose
-
-$commonConfigurationData = @{
-    AllNodes = @(
-        @{
-            NodeName = 'localhost'
-            PsDscAllowDomainUser = $true
-            CertificateFile = "$certificateFilePathName"
-            Thumbprint = "$($cert.Thumbprint)"
-        }
-    )
-}
-& $configFunc @dscParameters -ConfigurationData $commonConfigurationData -OutputPath $DscWorkPath
-Start-DscConfiguration -Path .\ -Force -Wait -Verbose
 } -Verbose
-
+    
 [String]$ExceptionErrors = $Error.Exception
-
+    
 if ($ExceptionErrors -like "*You cannot call a method on a null-valued*")
 {
     $Error.Clear()
     $ADSession = New-PSSession -ComputerName '10.100.100.10' -Credential $DomainCredential
     Get-VM -Name AD-01 | Restart-VM -Force
     Start-Sleep -Seconds 120
-    Invoke-Command -VMName AD-01 -Credential $DomainCredential -ScriptBlock {
-        $VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
 
+    Invoke-Command -VMName AD-01 -Credential $DomainCredential -ScriptBlock
+    {
+        $VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
+    
         $Username = 'Contoso\Administrator'
         $DomainCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
-
+    
         $configFunc = "CaRootConfig"
         Set-Location 'C:\DSCConfigs'
         $scriptFilePathName = ".\CaRootConfig.ps1"
         Write-Verbose "Dot sourcing functions in PS1 script '$scriptFilePathName'"
         . $scriptFilePathName # load the DSC configuration functions into session
-
+    
         $dscParameters = @{
             Hostname = $ENV:Computername
             Credential = $DomainCredential
@@ -1276,16 +1045,18 @@ if ($ExceptionErrors -like "*You cannot call a method on a null-valued*")
             DomainDistinguishedName = 'CN=AD-01-CA,DC=Contoso,DC=local' 
             DomainName = 'contoso.local'
         }
-
+    
         $DscWorkPath = 'C:\DSCConfigs'
         $certificateFilePathName = Join-Path -Path $DscWorkPath -ChildPath "$(hostname).cer"
         $cert = Get-ChildItem -Path 'Cert:\LocalMachine\My' -DocumentEncryptionCert | Where-Object -FilterScript { $psItem.Subject -eq "DSC Document Encryption" }
+
         if ($null -eq $cert) 
         {
             $cert = New-SelfSignedCertificate -Subject "DSC Document Encryption" -Type DocumentEncryptionCert -TextExtension "2.5.29.17={text}DNS=localhost" -CertStoreLocation Cert:\LocalMachine\My -ErrorAction Stop
         }
-        $null = $cert | Export-Certificate -Type CERT -FilePath $certificateFilePathName -Force
 
+        $null = $cert | Export-Certificate -Type CERT -FilePath $certificateFilePathName -Force
+    
         Configuration LcmSettings {
             param(
                 [Parameter(Mandatory = $true)]
@@ -1294,7 +1065,6 @@ if ($ExceptionErrors -like "*You cannot call a method on a null-valued*")
                 [string]
                 $CertificateId
             )
-
             node localhost {
                 LocalConfigurationManager {
                     ConfigurationMode = "ApplyOnly"
@@ -1304,11 +1074,11 @@ if ($ExceptionErrors -like "*You cannot call a method on a null-valued*")
                 }
             }
         }
-
+    
         & LcmSettings -CertificateId $cert.Thumbprint -OutputPath $DscWorkPath -Verbose
-
+    
         Set-DscLocalConfigurationManager -Path $DscWorkPath -Force -Verbose
-
+    
         $commonConfigurationData = @{
             AllNodes = @(
                 @{
@@ -1319,31 +1089,33 @@ if ($ExceptionErrors -like "*You cannot call a method on a null-valued*")
                 }
             )
         }
+
         & $configFunc @dscParameters -ConfigurationData $commonConfigurationData -OutputPath $DscWorkPath
         Start-DscConfiguration -Path .\ -Force -Wait -Verbose
-    } -Verbose
+    }
 }
-
+    
 [String]$ExceptionErrors = $Error.Exception
-
+    
 if ($ExceptionErrors)
 {
     if ($ExceptionErrors -like "*Failed to start service `'Active Directory Certificate Services (certsvc)`'*")
     {
         Get-Service CertSvc | Start-Service
         $Error.Clear()
-        Invoke-Command -Session $ADSession -ScriptBlock {
+        Invoke-Command -Session $ADSession -ScriptBlock 
+        {
             $VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
-
+    
             $Username = 'Contoso\Administrator'
             $DomainCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
-
+    
             $configFunc = "CaRootConfig"
             Set-Location 'C:\DSCConfigs'
             $scriptFilePathName = ".\CaRootConfig.ps1"
             Write-Verbose "Dot sourcing functions in PS1 script '$scriptFilePathName'"
             . $scriptFilePathName # load the DSC configuration functions into session
-
+    
             $dscParameters = @{
                 Hostname = $ENV:Computername
                 Credential = $DomainCredential
@@ -1351,16 +1123,18 @@ if ($ExceptionErrors)
                 DomainDistinguishedName = 'CN=AD-01-CA,DC=Contoso,DC=local' 
                 DomainName = 'contoso.local'
             }
-
+    
             $DscWorkPath = 'C:\DSCConfigs'
             $certificateFilePathName = Join-Path -Path $DscWorkPath -ChildPath "$(hostname).cer"
             $cert = Get-ChildItem -Path 'Cert:\LocalMachine\My' -DocumentEncryptionCert | Where-Object -FilterScript { $psItem.Subject -eq "DSC Document Encryption" }
+
             if ($null -eq $cert) 
             {
                 $cert = New-SelfSignedCertificate -Subject "DSC Document Encryption" -Type DocumentEncryptionCert -TextExtension "2.5.29.17={text}DNS=localhost" -CertStoreLocation Cert:\LocalMachine\My -ErrorAction Stop
             }
-            $null = $cert | Export-Certificate -Type CERT -FilePath $certificateFilePathName -Force
 
+            $null = $cert | Export-Certificate -Type CERT -FilePath $certificateFilePathName -Force
+    
             Configuration LcmSettings {
                 param(
                     [Parameter(Mandatory = $true)]
@@ -1369,7 +1143,7 @@ if ($ExceptionErrors)
                     [string]
                     $CertificateId
                 )
-
+    
                 node localhost {
                     LocalConfigurationManager {
                         ConfigurationMode = "ApplyOnly"
@@ -1379,11 +1153,11 @@ if ($ExceptionErrors)
                     }
                 }
             }
-
+    
             & LcmSettings -CertificateId $cert.Thumbprint -OutputPath $DscWorkPath -Verbose
-
+    
             Set-DscLocalConfigurationManager -Path $DscWorkPath -Force -Verbose
-
+    
             $commonConfigurationData = @{
                 AllNodes = @(
                     @{
@@ -1394,12 +1168,14 @@ if ($ExceptionErrors)
                     }
                 )
             }
+
             & $configFunc @dscParameters -ConfigurationData $commonConfigurationData -OutputPath $DscWorkPath
+
             Start-DscConfiguration -Path .\ -Force -Wait -Verbose
-        } -Verbose
+        }
     }
 }
-
+    
 if ($Error)
 {
     Throw $($Error.Exception)
