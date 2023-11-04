@@ -945,7 +945,10 @@ Copy-Item E:\SetupFiles\software\HubModules.zip -Destination C:\ -ToSession $ADS
 Copy-Item E:\SetupFiles\software\Scripts.zip -Destination C:\ -ToSession $ADSession
 Copy-Item E:\SetupFiles\DSC\Modules -Destination 'C:\Program Files\WindowsPowerShell' -Force -Recurse -ToSession $ADSession | Out-Null
 Copy-Item E:\SetupFiles\DSC\DSCConfigs -Destination 'C:\' -Force -Recurse -ToSession $ADSession | Out-Null
-    
+Invoke-Command -Session $ADSession -ScriptBlock {
+    Expand-Archive -Path C:\HubModules.zip -DestinationPath 'C:\Program Files\WindowsPowerShell\Modules' -Force
+}
+
 Invoke-Command -Session $ADSession -ScriptBlock {
 
     $VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
