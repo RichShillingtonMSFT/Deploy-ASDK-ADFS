@@ -796,8 +796,8 @@ $U_Unattend.OuterXml | Out-File ($Prepare_Vhdx_DriveLetter+":\unattend.xml") -En
 
 Foreach ($Server in $Servers)
 {
-    New-VM -Name $Server.ServerName -BootDevice VHD -VHDPath ('C:\VMDisks\' + $Server.ServerName + '.vhd') -MemoryStartupBytes 4GB -SwitchName 'ADSwitch'
-    Set-VMProcessor -VMName $Server.ServerName -count 2
+    New-VM -Name $Server.ServerName -BootDevice VHD -VHDPath ('C:\VMDisks\' + $Server.ServerName + '.vhd') -MemoryStartupBytes 12GB -SwitchName 'ADSwitch'
+    Set-VMProcessor -VMName $Server.ServerName -count 6
     Start-VM -Name $Server.ServerName
     Start-Sleep -Seconds 160
     $InterfaceIndex = Invoke-Command -VMName $Server.ServerName -Credential $LocalCredential -ScriptBlock {(Get-NetAdapter).ifIndex}
@@ -805,6 +805,7 @@ Foreach ($Server in $Servers)
         Set-DnsClientServerAddress -InterfaceIndex $Using:InterfaceIndex -ServerAddresses 10.100.100.10,8.8.8.8;
         New-NetIPAddress -InterfaceIndex $Using:InterfaceIndex -IPAddress $Using:Server.IPAddress -PrefixLength 24 -DefaultGateway '10.100.100.1'
     }
+    Enable-VMIntegrationService -VMName $Server.ServerName -Name "Guest Service Interface"
     Start-Sleep -Seconds 20
     Get-VM -Name $Server.ServerName | Restart-VM -Force -Wait
     Start-Sleep -Seconds 160
