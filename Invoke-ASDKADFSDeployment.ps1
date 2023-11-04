@@ -933,7 +933,7 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
 
 $ScriptString = @'
 $VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
-    
+
 $Username = 'Contoso\Administrator'
 $DomainCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
     
@@ -1017,17 +1017,16 @@ Invoke-Command -Session $ADSession -ScriptBlock {
 } -Verbose
     
 [String]$ExceptionErrors = $Error.Exception
-    
+
 if ($ExceptionErrors -like "*You cannot call a method on a null-valued*")
 {
     $Error.Clear()
-    $ADSession = New-PSSession -ComputerName '10.100.100.10' -Credential $DomainCredential
     Get-VM -Name AD-01 | Restart-VM -Force
     Start-Sleep -Seconds 120
+    $ADSession = New-PSSession -ComputerName '10.100.100.10' -Credential $DomainCredential
 
-    Invoke-Command -VMName AD-01 -Credential $DomainCredential -ScriptBlock
-    {
-        $VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
+    Invoke-Command -VMName AD-01 -Credential $DomainCredential -ScriptBlock {
+        $VirtualMachinePassword = ConvertTo-SecureString -String '' -AsPlainText -Force
     
         $Username = 'Contoso\Administrator'
         $DomainCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
@@ -1094,17 +1093,18 @@ if ($ExceptionErrors -like "*You cannot call a method on a null-valued*")
         Start-DscConfiguration -Path .\ -Force -Wait -Verbose
     }
 }
-    
+
 [String]$ExceptionErrors = $Error.Exception
     
 if ($ExceptionErrors)
 {
     if ($ExceptionErrors -like "*Failed to start service `'Active Directory Certificate Services (certsvc)`'*")
     {
-        Get-Service CertSvc | Start-Service
         $Error.Clear()
-        Invoke-Command -Session $ADSession -ScriptBlock 
-        {
+        Invoke-Command -Session $ADSession -ScriptBlock {
+
+            Get-Service CertSvc | Start-Service
+        
             $VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
     
             $Username = 'Contoso\Administrator'
