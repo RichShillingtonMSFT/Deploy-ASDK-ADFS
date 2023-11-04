@@ -1225,107 +1225,105 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
 $ScriptString = @'
 $VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
 
-$Username = '.\Administrator'
-$LocalCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
-
 $Username = 'Contoso\Administrator'
 $DomainCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
 
-Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock 
+Invoke-Command -VMName 'AD-01' -Credential $DomainCredential -ScriptBlock {
+$domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
+$pdc = $domain.PdcRoleOwner.Name
+$rootDSE = [adsi]"LDAP://$pdc/rootdse"
+
+# distinguishedName where the certificate templates are stored in AD
+$certificateTemplatesBaseDN = "CN=Certificate Templates,CN=Public Key Services,CN=Services,$($rootDSE.configurationNamingContext)"
+$certificateTemplatesBaseDE = [adsi]"LDAP://$pdc/$certificateTemplatesBaseDN"
+
+$templates = $certificateTemplatesBaseDE| Select-Object -ExpandProperty Children
+
+if ($templates.distinguishedName -contains "CN=AzureStack,CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,DC=contoso,DC=local")
 {
-    $domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
-    $pdc = $domain.PdcRoleOwner.Name
-    $rootDSE = [adsi]"LDAP://$pdc/rootdse"
+    Add-CATemplate -Name 'AzureStack' -force
+}
 
-    # distinguishedName where the certificate templates are stored in AD
-    $certificateTemplatesBaseDN = "CN=Certificate Templates,CN=Public Key Services,CN=Services,$($rootDSE.configurationNamingContext)"
-    $certificateTemplatesBaseDE = [adsi]"LDAP://$pdc/$certificateTemplatesBaseDN"
-
-    $templates = $certificateTemplatesBaseDE| Select-Object -ExpandProperty Children
-
-    if ($templates.distinguishedName -contains "CN=AzureStack,CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,DC=contoso,DC=local")
+else
+{
+    do
     {
-        Add-CATemplate -Name 'AzureStack' -force
+        Stop-Service CertSvc
+
+        Start-Sleep -Seconds 5
+
+        Start-Service CertSvc
+
+        Start-Sleep -Seconds 5
+
+        $domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
+        $pdc = $domain.PdcRoleOwner.Name
+        $rootDSE = [adsi]"LDAP://$pdc/rootdse"
+
+        # distinguishedName where the certificate templates are stored in AD
+        $certificateTemplatesBaseDN = "CN=Certificate Templates,CN=Public Key Services,CN=Services,$($rootDSE.configurationNamingContext)"
+        $certificateTemplatesBaseDE = [adsi]"LDAP://$pdc/$certificateTemplatesBaseDN"
+
+        $templates = $certificateTemplatesBaseDE| Select-Object -ExpandProperty Children
     }
+    Until (($templates.distinguishedName -contains "CN=AzureStack,CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,DC=contoso,DC=local"))
 
-    else
+    Add-CATemplate -Name 'AzureStack' -force
+}
+
+[String]$ExceptionErrors = $Error.Exception
+
+if ($ExceptionErrors)
+{
+    $Error.Clear()
+    Restart-Service CertSvc -Force
+    Start-Sleep -Seconds 120
+
+    if ($ExceptionErrors -like "*template does not exist in the domain.*")
     {
-        do
+        $domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
+        $pdc = $domain.PdcRoleOwner.Name
+        $rootDSE = [adsi]"LDAP://$pdc/rootdse"
+
+        # distinguishedName where the certificate templates are stored in AD
+        $certificateTemplatesBaseDN = "CN=Certificate Templates,CN=Public Key Services,CN=Services,$($rootDSE.configurationNamingContext)"
+        $certificateTemplatesBaseDE = [adsi]"LDAP://$pdc/$certificateTemplatesBaseDN"
+
+        $templates = $certificateTemplatesBaseDE| Select-Object -ExpandProperty Children
+
+        if ($templates.distinguishedName -contains "CN=AzureStack,CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,DC=contoso,DC=local")
         {
-            Stop-Service CertSvc
-
-            Start-Sleep -Seconds 5
-
-            Start-Service CertSvc
-
-            Start-Sleep -Seconds 5
-
-            $domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
-            $pdc = $domain.PdcRoleOwner.Name
-            $rootDSE = [adsi]"LDAP://$pdc/rootdse"
-
-            # distinguishedName where the certificate templates are stored in AD
-            $certificateTemplatesBaseDN = "CN=Certificate Templates,CN=Public Key Services,CN=Services,$($rootDSE.configurationNamingContext)"
-            $certificateTemplatesBaseDE = [adsi]"LDAP://$pdc/$certificateTemplatesBaseDN"
-
-            $templates = $certificateTemplatesBaseDE| Select-Object -ExpandProperty Children
+            Add-CATemplate -Name 'AzureStack' -force
         }
-        Until (($templates.distinguishedName -contains "CN=AzureStack,CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,DC=contoso,DC=local"))
 
-        Add-CATemplate -Name 'AzureStack' -force
-    }
-
-    [String]$ExceptionErrors = $Error.Exception
-    if ($ExceptionErrors)
-    {
-        $Error.Clear()
-        Restart-Service CertSvc -Force
-        Start-Sleep -Seconds 120
-        if ($ExceptionErrors -like "*template does not exist in the domain.*")
+        else
         {
-            $domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
-            $pdc = $domain.PdcRoleOwner.Name
-            $rootDSE = [adsi]"LDAP://$pdc/rootdse"
-
-            # distinguishedName where the certificate templates are stored in AD
-            $certificateTemplatesBaseDN = "CN=Certificate Templates,CN=Public Key Services,CN=Services,$($rootDSE.configurationNamingContext)"
-            $certificateTemplatesBaseDE = [adsi]"LDAP://$pdc/$certificateTemplatesBaseDN"
-
-            $templates = $certificateTemplatesBaseDE| Select-Object -ExpandProperty Children
-
-            if ($templates.distinguishedName -contains "CN=AzureStack,CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,DC=contoso,DC=local")
+            do
             {
-                Add-CATemplate -Name 'AzureStack' -force
+                Stop-Service CertSvc
+
+                Start-Sleep -Seconds 5
+
+                Start-Service CertSvc
+
+                Start-Sleep -Seconds 5
+
+                $domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
+                $pdc = $domain.PdcRoleOwner.Name
+                $rootDSE = [adsi]"LDAP://$pdc/rootdse"
+
+                # distinguishedName where the certificate templates are stored in AD
+                $certificateTemplatesBaseDN = "CN=Certificate Templates,CN=Public Key Services,CN=Services,$($rootDSE.configurationNamingContext)"
+                $certificateTemplatesBaseDE = [adsi]"LDAP://$pdc/$certificateTemplatesBaseDN"
+
+                $templates = $certificateTemplatesBaseDE| Select-Object -ExpandProperty Children
             }
+            Until (($templates.distinguishedName -contains "CN=AzureStack,CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,DC=contoso,DC=local"))
 
-            else
-            {
-                do
-                {
-                    Stop-Service CertSvc
-
-                    Start-Sleep -Seconds 5
-
-                    Start-Service CertSvc
-
-                    Start-Sleep -Seconds 5
-
-                    $domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
-                    $pdc = $domain.PdcRoleOwner.Name
-                    $rootDSE = [adsi]"LDAP://$pdc/rootdse"
-
-                    # distinguishedName where the certificate templates are stored in AD
-                    $certificateTemplatesBaseDN = "CN=Certificate Templates,CN=Public Key Services,CN=Services,$($rootDSE.configurationNamingContext)"
-                    $certificateTemplatesBaseDE = [adsi]"LDAP://$pdc/$certificateTemplatesBaseDN"
-
-                    $templates = $certificateTemplatesBaseDE| Select-Object -ExpandProperty Children
-                }
-                Until (($templates.distinguishedName -contains "CN=AzureStack,CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,DC=contoso,DC=local"))
-
-                Add-CATemplate -Name 'AzureStack' -force
-            }
+            Add-CATemplate -Name 'AzureStack' -force
         }
     }
+}
 }
 
 if ($Error)
@@ -1333,65 +1331,6 @@ if ($Error)
     Throw $($Error.Exception)
     break
 }
-'@
-
-    $ScriptString = $ScriptString.Replace('[AdminPassword]',"$AdminPassword")
-
-    Invoke-AzVMRunCommand -VMName $VirtualMachineName `
-        -ResourceGroupName $LabResourceGroup.ResourceGroupName `
-        -CommandId 'RunPowerShellScript' `
-        -ScriptString $ScriptString -AsJob | Out-Null
-}
-
-$Result = Get-Job | Wait-Job | Receive-Job
-$EndTime = (Get-Date)
-
-if (($Result.Value.DisplayStatus | Select-Object -Unique) -ne 'Provisioning succeeded') 
-{
-    throw 'Failed to prepare VM Disks!'
-    break
-}
-else
-{
-    Write-Host "PowerShell Job $($Result.Value.DisplayStatus)" -ForegroundColor Green
-    Write-Host "$($Result.Value.Message)" -ForegroundColor Green
-    Write-Host "StartTime $($StartTime)" -ForegroundColor White
-    Write-Host "EndTime $($EndTime)" -ForegroundColor White
-    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime - $StartTime)) -ForegroundColor White
-    Write-Host ""
-}
-#endregion
-
-#region Join ADFS to the Domain
-Write-Host "Now I am going to join ADFS-01 to the Domain." -ForegroundColor Yellow
-Write-Host "This should take less than 4 minutes." -ForegroundColor Yellow
-Write-Host ""
-$StartTime = (Get-Date)
-
-foreach ($VirtualMachineName in $DeployedVirtualMachines)
-{
-    Write-Host "$($VirtualMachineName) - Joining ADFS to the Domain" -ForegroundColor Green
-    Write-Host ""
-
-$ScriptString = @'
-$VirtualMachinePassword = ConvertTo-SecureString -String '[AdminPassword]' -AsPlainText -Force
-
-$Username = '.\Administrator'
-$LocalCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
-
-$Username = 'Contoso\Administrator'
-$DomainCredential = New-Object System.Management.Automation.PSCredential($Username,$VirtualMachinePassword)
-
-Restart-VM -Name 'ADFS-01' -Force -Wait
-
-do 
-{
-    $RDPTest = Test-NetConnection -ComputerName 10.100.100.11 -Port 3389
-}
-until ($RDPTest.TcpTestSucceeded -eq $true)
-
-# Configure ADFS
-Invoke-Command -VMName 'ADFS-01' -Credential $LocalCredential -ScriptBlock {Add-Computer -DomainName 'Contoso.local' -Credential $Using:DomainCredential -Restart} -Verbose -ErrorAction 'Stop'
 '@
 
     $ScriptString = $ScriptString.Replace('[AdminPassword]',"$AdminPassword")
