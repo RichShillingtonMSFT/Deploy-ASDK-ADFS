@@ -1101,6 +1101,8 @@ if ($ExceptionErrors -like "*You cannot call a method on a null-valued*")
     
 if ($ExceptionErrors)
 {
+    $Error.Clear()
+
     if ($ExceptionErrors -like "*Failed to start service `'Active Directory Certificate Services (certsvc)`'*")
     {
         $Error.Clear()
@@ -1253,11 +1255,11 @@ else
     {
         Stop-Service CertSvc
 
-        Start-Sleep -Seconds 5
+        Start-Sleep -Seconds 25
 
         Start-Service CertSvc
 
-        Start-Sleep -Seconds 5
+        Start-Sleep -Seconds 25
 
         $domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
         $pdc = $domain.PdcRoleOwner.Name
@@ -1305,11 +1307,11 @@ if ($ExceptionErrors)
             {
                 Stop-Service CertSvc
 
-                Start-Sleep -Seconds 5
+                Start-Sleep -Seconds 25
 
                 Start-Service CertSvc
 
-                Start-Sleep -Seconds 5
+                Start-Sleep -Seconds 25
 
                 $domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
                 $pdc = $domain.PdcRoleOwner.Name
@@ -1327,6 +1329,16 @@ if ($ExceptionErrors)
         }
     }
 }
+}
+
+[String]$ExceptionErrors = $Error.Exception
+if ($ExceptionErrors)
+{
+    $Error.Clear()
+    $ADSession = New-PSSession -ComputerName '10.100.100.10' -Credential $DomainCredential
+    Invoke-Command -Session $ADSession -ScriptBlock {Restart-Computer -Force -Wait 0}
+    Start-Sleep -Seconds 200
+    Invoke-Command -Session $ADSession -ScriptBlock {Add-CATemplate -Name 'AzureStack' -force}
 }
 
 if ($Error)
