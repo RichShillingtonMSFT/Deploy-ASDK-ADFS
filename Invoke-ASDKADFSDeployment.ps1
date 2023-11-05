@@ -1393,19 +1393,34 @@ Invoke-Command -Session $ADSession -ScriptBlock {
 }
 
 Start-Sleep -Seconds 120
+
 try
 {
     Invoke-Command -Session $CSSession -ScriptBlock {
         Add-CATemplate -Name 'AzureStack' -Force
-        #Restart-Service CertSvc -Force
-    }
+    } -ErrorAction Stop
 }
 catch
 {
-    Invoke-Command -Session $CSSession -ScriptBlock {
-        Restart-Service CertSvc -Force
-        Start-Sleep -Seconds 20
-        Add-CATemplate -Name 'AzureStack' -Force
+    try
+    {
+        Invoke-Command -Session $CSSession -ScriptBlock {
+            Restart-Service CertSvc -Force
+            Start-Sleep -Seconds 20
+            Add-CATemplate -Name 'AzureStack' -Force
+        } -ErrorAction Stop
+    }
+    catch
+    {
+        Invoke-Command -Session $CSSession -ScriptBlock {
+            Restart-Computer -Force -Wait 0 -ErrorAction SilentlyContinue
+        }
+
+        Start-Sleep -Seconds 200
+
+        Invoke-Command -VMName 'ADCS-01' -Credential $DomainCredential -ScriptBlock {
+            Add-CATemplate -Name 'AzureStack' -Force
+        } -ErrorAction Stop
     }
 }
 '@
