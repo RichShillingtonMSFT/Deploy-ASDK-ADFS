@@ -1225,7 +1225,7 @@ else
 
 #region Set Certificate Template Permissions & Make the Azure Stack Certificate Template available for Enroll
 Write-Host "Now I am going to set Certificate Template Permissions & Make the Azure Stack Certificate Template available for Enroll" -ForegroundColor Yellow
-Write-Host "This should take less than  minutes." -ForegroundColor Yellow
+Write-Host "This should take about 5 minutes." -ForegroundColor Yellow
 Write-Host ""
 $StartTime = (Get-Date)
 
@@ -1397,7 +1397,15 @@ Invoke-Command -Session $ADSession -ScriptBlock {
 }
 
 Invoke-Command -Session $ADSession -ScriptBlock {
-$Object = Get-ADObject -Identity 'CN=ADCS-01-CA,CN=Enrollment Services,CN=Public Key Services,CN=Services,CN=Configuration,DC=contoso,DC=local' -Properties certificateTemplates
+$domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
+$pdc = $domain.PdcRoleOwner.Name
+$rootDSE = [adsi]"LDAP://$pdc/rootdse"
+
+$EnrollmentServicesBaseDN = "CN=Enrollment Services,CN=Public Key Services,CN=Services,$($rootDSE.configurationNamingContext)"
+$EnrollmentServicesBaseDE = [adsi]"LDAP://$pdc/$EnrollmentServicesBaseDN"
+$EnrollmentServicesBaseDE.Children.distinguishedName
+
+$Object = Get-ADObject -Identity "$($EnrollmentServicesBaseDE.Children.distinguishedName)" -Properties certificateTemplates
 $Object.certificateTemplates.Add('AzureStack')
 Set-ADObject -Instance $Object
 }
@@ -1439,6 +1447,7 @@ else
 #region Generate Deployment Certificates
 Write-Host "Now we are getting close. Just a few more things to take care of..." -ForegroundColor Yellow
 Write-Host "I need to generate the Azure Stack Deployment Certificates." -ForegroundColor Yellow
+Write-Host "This should take about 3 minutes." -ForegroundColor Yellow
 Write-Host ""
 $StartTime = (Get-Date)
 
