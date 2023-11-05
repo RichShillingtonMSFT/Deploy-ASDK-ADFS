@@ -929,7 +929,7 @@ else
 
 #region Install Certificate Services
 Write-Host "Now I will install Certificate Services." -ForegroundColor Yellow
-Write-host "This should take about 10 minutes." -ForegroundColor Yellow
+Write-host "This should take less than 10 minutes." -ForegroundColor Yellow
 Write-Host ""
 $StartTime = (Get-Date)
 
@@ -1392,37 +1392,64 @@ Invoke-Command -Session $ADSession -ScriptBlock {
     $templateDE.Dispose()
 }
 
-Start-Sleep -Seconds 120
+Start-Sleep -Seconds 30
 
-try
-{
-    Invoke-Command -Session $CSSession -ScriptBlock {
-        Add-CATemplate -Name 'AzureStack' -Force
-    } -ErrorAction Stop
-}
-catch
-{
-    try
-    {
-        Invoke-Command -Session $CSSession -ScriptBlock {
-            Restart-Service CertSvc -Force
-            Start-Sleep -Seconds 20
-            Add-CATemplate -Name 'AzureStack' -Force
-        } -ErrorAction Stop
+Invoke-Command -VMName 'ADCS-01' -Credential $DomainCredential -ScriptBlock {
+    $ConfigContext = ([ADSI]"LDAP://RootDSE").ConfigurationNamingContext 
+    $ADSI = [ADSI]"LDAP://CN=Certificate Templates,CN=Public Key Services,CN=Services,$ConfigContext"
+
+    $templates = $adsi | select -ExpandProperty Children 
+
+    if ([bool]($templates.distinguishedName -match "CN=AzureStack,CN=Certificate Templates,CN=Public Key Services,CN=Services,$ConfigContext") -eq 'True'){
+
+        Add-CATemplate -Name 'AzureStack' -force
     }
-    catch
-    {
-        $Error.Clear()
-        Invoke-Command -Session $CSSession -ScriptBlock {
-            Restart-Computer -Force -Wait 0 -ErrorAction SilentlyContinue
-        }
 
-        Start-Sleep -Seconds 200
+    $Stoploop = $false
+    [int]$Retrycount = "0"
+ 
+    do {
+	
+        try 
+        {
+		
+            if ([bool]($templates.distinguishedName -match "CN=AzureStack,CN=Certificate Templates,CN=Public Key Services,CN=Services,$ConfigContext") -eq 'True'){
+                if (Get-CATemplate | Where-Object {$_.Name -eq 'AzureStack'})
+                {
+                    Write-Host "Template Published Successfully"
+		            $Stoploop = $true
+                }
+                else
+                {
+                    Add-CATemplate -Name 'AzureStack' -force -ErrorAction Stop
+                    Write-Host "Template Published Successfully"
+		            $Stoploop = $true
+                }
+            }
 
-        Invoke-Command -VMName 'ADCS-01' -Credential $DomainCredential -ScriptBlock {
-            Add-CATemplate -Name 'AzureStack' -Force
-        } -ErrorAction Stop
+	    }
+	    catch 
+        {
+		    if ($Retrycount -gt 30)
+            {
+			    Write-Host "Could not Publish Template after 30 retrys."
+			    $Stoploop = $true
+		    }
+		    else 
+            {
+			    Write-Host "Could not Publish Template, retrying..."
+                Stop-Service CertSvc
+
+			    Start-Sleep -Seconds 10
+
+                Start-Service CertSvc
+
+			    Start-Sleep -Seconds 10
+			    $Retrycount = $Retrycount + 1
+		    }
+	    }
     }
+    While ($Stoploop -eq $false)
 }
 '@
 
