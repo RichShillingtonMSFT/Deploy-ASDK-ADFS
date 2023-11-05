@@ -929,7 +929,7 @@ else
 
 #region Install Certificate Services
 Write-Host "Now I will install Certificate Services." -ForegroundColor Yellow
-Write-host "This should take about 5-10 minutes." -ForegroundColor Yellow
+Write-host "This should take about 10 minutes." -ForegroundColor Yellow
 Write-Host ""
 $StartTime = (Get-Date)
 
@@ -1226,7 +1226,6 @@ else
 #region Set Certificate Template Permissions & Make the Azure Stack Certificate Template available for Enroll
 Write-Host "Now I am going to set Certificate Template Permissions & Make the Azure Stack Certificate Template available for Enroll" -ForegroundColor Yellow
 Write-Host "This should take less than  minutes." -ForegroundColor Yellow
-Write-Host $('Calm Down! It has only been like {0:mm} minutes since we started this script. It is getting there.' -f ((Get-Date) - $ScriptStartTime)) -ForegroundColor Yellow
 Write-Host ""
 $StartTime = (Get-Date)
 
