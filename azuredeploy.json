@@ -50,7 +50,7 @@
     },
     "dnsPrefixForPublicIP": {
       "type": "string",
-      "defaultValue": "hub-",
+      "defaultValue": "hub",
       "maxLength": 14,
       "minLength": 2,
       "metadata": {
@@ -113,7 +113,7 @@
   "functions": [],
   "variables": {
     "VMPrefix":"[concat(parameters('virtualMachineNamePrefix'),'-')]",
-    "PIPPrefix":"[concat(parameters('dnsPrefixForPublicIP'),'-')]",
+    "PIPPrefix":"[toLower(concat(parameters('dnsPrefixForPublicIP'), '-'))]",
     "NSGName":"[concat(parameters('networkSecurityGroupName'),'-',parameters('location'))]",
     "VNETName":"[concat(parameters('virtualNetworkName'),'-',parameters('location'))]",
     "diagnosticStorageAccountName": "[concat('diagst',uniqueString(resourceGroup().id))]",
