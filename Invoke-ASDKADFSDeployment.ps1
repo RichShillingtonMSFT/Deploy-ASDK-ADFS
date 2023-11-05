@@ -88,7 +88,6 @@ Param
 
 #region Functions & Variables
 $WarningPreference = 'SilentlyContinue'
-$VerbosePreference = 'Continue'
 
 $ScriptStartTime = (Get-Date)
 
