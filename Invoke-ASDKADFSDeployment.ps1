@@ -1412,6 +1412,7 @@ catch
     }
     catch
     {
+        $Error.Clear()
         Invoke-Command -Session $CSSession -ScriptBlock {
             Restart-Computer -Force -Wait 0 -ErrorAction SilentlyContinue
         }
