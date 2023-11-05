@@ -850,14 +850,14 @@ else
 
 #region Install Active Directory & add ADFS and ADCS to the Domain
 Write-Host "Now I will install Active Directory" -ForegroundColor Yellow
-Write-Host "I am also going to add ADFS and ADCS to the Domain." -ForegroundColor Yellow
+Write-Host "I am also going to add ADFS and ADCS Servers to the Domain." -ForegroundColor Yellow
 Write-host "This should take about 15 minutes." -ForegroundColor Yellow
 Write-Host ""
 $StartTime = (Get-Date)
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
-    Write-Host "$($VirtualMachineName) - Installing Active Directory" -ForegroundColor Green
+    Write-Host "$($VirtualMachineName) - Installing Active Directory & adding ADFS & ADCS Servers to the Domain" -ForegroundColor Green
     Write-Host ""
 
 $ScriptString = @'
@@ -1392,7 +1392,11 @@ Invoke-Command -Session $ADSession -ScriptBlock {
     $templateDE.Dispose()
 }
 
-Start-Sleep -Seconds 30
+Start-Sleep -Seconds 300
+
+Get-VM -Name 'ADCS-01' | Stop-VM -Passthru -Force
+Start-VM -Name 'ADCS-01' -Passthru
+Start-Sleep -Seconds 60
 
 Invoke-Command -VMName 'ADCS-01' -Credential $DomainCredential -ScriptBlock {
     $ConfigContext = ([ADSI]"LDAP://RootDSE").ConfigurationNamingContext 
