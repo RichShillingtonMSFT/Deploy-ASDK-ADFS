@@ -1293,6 +1293,7 @@ Invoke-Command -Session $ADSession -ScriptBlock {
     $templateDE.Properties["msPKI-Template-Schema-Version"].Value = 2
     $templateDE.Properties["revision"].Value = 100
     $templateDE.CommitChanges()
+    $templateDE.RefreshCache()
 }
 
 Invoke-Command -Session $ADSession -ScriptBlock {
@@ -1323,6 +1324,7 @@ Invoke-Command -Session $ADSession -ScriptBlock {
                 $accessControlType)
             $templateDE.ObjectSecurity.AddAccessRule($ace)
             $templateDE.CommitChanges()
+            $templateDE.RefreshCache()
 
         }
         catch
@@ -1344,6 +1346,7 @@ Invoke-Command -Session $ADSession -ScriptBlock {
                 $inheritanceFlags)
             $templateDE.ObjectSecurity.AddAccessRule($ace)
             $templateDE.CommitChanges()
+            $templateDE.RefreshCache()
 
         }
         catch
@@ -1389,72 +1392,17 @@ Invoke-Command -Session $ADSession -ScriptBlock {
         $inheritanceFlags)
     $templateDE.ObjectSecurity.AddAccessRule($ace)
     $templateDE.CommitChanges()
+    $templateDE.RefreshCache()
     $templateDE.Dispose()
 }
 
-Start-Sleep -Seconds 300
-
-Get-VM -Name 'ADCS-01' | Stop-VM -Passthru -Force
-Start-VM -Name 'ADCS-01' -Passthru
-Start-Sleep -Seconds 60
-
-Invoke-Command -VMName 'ADCS-01' -Credential $DomainCredential -ScriptBlock {
-    $ConfigContext = ([ADSI]"LDAP://RootDSE").ConfigurationNamingContext 
-    $ADSI = [ADSI]"LDAP://CN=Certificate Templates,CN=Public Key Services,CN=Services,$ConfigContext"
-
-    $templates = $adsi | select -ExpandProperty Children 
-
-    if ([bool]($templates.distinguishedName -match "CN=AzureStack,CN=Certificate Templates,CN=Public Key Services,CN=Services,$ConfigContext") -eq 'True'){
-
-        Add-CATemplate -Name 'AzureStack' -force
-    }
-
-    $Stoploop = $false
-    [int]$Retrycount = "0"
- 
-    do {
-	
-        try 
-        {
-		
-            if ([bool]($templates.distinguishedName -match "CN=AzureStack,CN=Certificate Templates,CN=Public Key Services,CN=Services,$ConfigContext") -eq 'True'){
-                if (Get-CATemplate | Where-Object {$_.Name -eq 'AzureStack'})
-                {
-                    Write-Host "Template Published Successfully"
-		            $Stoploop = $true
-                }
-                else
-                {
-                    Add-CATemplate -Name 'AzureStack' -force -ErrorAction Stop
-                    Write-Host "Template Published Successfully"
-		            $Stoploop = $true
-                }
-            }
-
-	    }
-	    catch 
-        {
-		    if ($Retrycount -gt 30)
-            {
-			    Write-Host "Could not Publish Template after 30 retrys."
-			    $Stoploop = $true
-		    }
-		    else 
-            {
-			    Write-Host "Could not Publish Template, retrying..."
-                Stop-Service CertSvc
-
-			    Start-Sleep -Seconds 10
-
-                Start-Service CertSvc
-
-			    Start-Sleep -Seconds 10
-			    $Retrycount = $Retrycount + 1
-		    }
-	    }
-    }
-    While ($Stoploop -eq $false)
+Invoke-Command -Session $ADSession -ScriptBlock {
+$Object = Get-ADObject -Identity 'CN=ADCS-01-CA,CN=Enrollment Services,CN=Public Key Services,CN=Services,CN=Configuration,DC=contoso,DC=local' -Properties certificateTemplates
+$Object.certificateTemplates.Add('AzureStack')
+Set-ADObject -Instance $Object
 }
+
+Start-Sleep -Seconds 300
 '@
 
     $ScriptString = $ScriptString.Replace('[AdminPassword]',"$AdminPassword")
