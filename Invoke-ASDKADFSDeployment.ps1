@@ -390,7 +390,7 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
 
 Write-Host "$($VirtualMachineName) - Converting and Resizing Disks." -ForegroundColor Green
-Write-Host "This takes about minutes"
+Write-Host ""
 
 $ScriptString = @'
 If ((Get-Service -Name 'Hyper-V Virtual Machine Management').Status -ne 'Running')
@@ -432,13 +432,6 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
     Write-Host ""
 
 $ScriptString = @"
-If ((Get-Service -Name 'Hyper-V Virtual Machine Management').Status -ne 'Running')
-{
-    Get-Service -Name 'Hyper-V Virtual Machine Management' | Start-Service -ErrorAction Stop
-}
-
-Import-Module Hyper-V
-
 `$Prepare_Vhdx_Path = "C:\SetupFiles\ASDK.vhdx"
 
 #Remove boot from previous deployment
