@@ -388,6 +388,46 @@ $StartTime = (Get-Date)
 
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
+
+Write-Host "$($VirtualMachineName) - Converting and Resizing Disks." -ForegroundColor Green
+Write-Host "This takes about minutes"
+
+$ScriptString = @'
+If ((Get-Service -Name 'Hyper-V Virtual Machine Management').Status -ne 'Running')
+{
+    Get-Service -Name 'Hyper-V Virtual Machine Management' | Start-Service -ErrorAction Stop
+}
+Import-Module Hyper-V
+Convert-VHD -Path "C:\SetupFiles\CloudBuilder.vhdx" -VHDType Fixed -DestinationPath "C:\SetupFiles\ASDK.vhdx" -DeleteSource -ErrorAction Stop
+Resize-VHD -Path "C:\SetupFiles\ASDK.vhdx" -SizeBytes 650gb
+'@
+}
+
+Invoke-AzVMRunCommand -VMName $VirtualMachineName `
+-ResourceGroupName $LabResourceGroup.ResourceGroupName `
+-CommandId 'RunPowerShellScript' `
+-ScriptString $ScriptString -AsJob | Out-Null
+
+$Result = Get-Job | Wait-Job | Receive-Job
+$EndTime = (Get-Date)
+
+if (($Result.Value.DisplayStatus | Select-Object -Unique) -ne 'Provisioning succeeded') 
+{
+    throw 'Failed to prepare VM Disks!'
+    break
+}
+else
+{
+    Write-Host "PowerShell Job $($Result.Value.DisplayStatus)" -ForegroundColor Green
+    Write-Host "$($Result.Value.Message)" -ForegroundColor Green
+    Write-Host "StartTime $($StartTime)" -ForegroundColor White
+    Write-Host "EndTime $($EndTime)" -ForegroundColor White
+    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime - $StartTime)) -ForegroundColor White
+    Write-Host ""
+}
+
+foreach ($VirtualMachineName in $DeployedVirtualMachines)
+{
     Write-Host "$($VirtualMachineName) - Preparing Virtual Machine VHDs and Configuring it for VHD Boot." -ForegroundColor Green
     Write-Host ""
 
@@ -398,9 +438,6 @@ If ((Get-Service -Name 'Hyper-V Virtual Machine Management').Status -ne 'Running
 }
 
 Import-Module Hyper-V
-
-Rename-Item -Path C:\SetupFiles\CloudBuilder.vhdx -NewName ASDK.vhdx -Force
-Resize-VHD -Path "C:\SetupFiles\ASDK.vhdx" -SizeBytes 650gb
 
 `$Prepare_Vhdx_Path = "C:\SetupFiles\ASDK.vhdx"
 
