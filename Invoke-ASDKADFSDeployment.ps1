@@ -233,7 +233,7 @@ $CSVFileName = $($LabResourceGroup.ResourceGroupName) + '-DeployedVMs-' + $(Get-
 $DataTable | Export-Csv "$ENV:UserProfile\Documents\$CSVFileName" -NoTypeInformation -Force
 #endregion
 
-#region Configure Virtual Machine Disks
+#region Configure Virtual Machine Disks & Install Hyper-V
 Write-host "I am now going to configure the Virtual Machine Disks & Install Hyper-V." -ForegroundColor Yellow
 Write-host "This takes about 5 minutes. Please wait..." -ForegroundColor Yellow
 Write-Host ""
@@ -381,8 +381,8 @@ else
 #endregion
 
 #region Prepare Virtual Machine Boot VHD & Configure OOBe Setup
-Write-Host "Now it is time to prepare the Virtual Machine VHDs and Configure the VM to boot from a VHD." -ForegroundColor Yellow
-Write-Host "Depending on Disk Speed, this can take a few minutes. Just relax...." -ForegroundColor Yellow
+Write-Host "Now it is time to expand & Convert the VHD." -ForegroundColor Yellow
+Write-Host "Depending on Disk Speed, this can take a long time. Just relax...." -ForegroundColor Yellow
 Write-Host ""
 $StartTime = (Get-Date)
 
@@ -393,12 +393,16 @@ Write-Host "$($VirtualMachineName) - Converting and Resizing Disks." -Foreground
 Write-Host ""
 
 $ScriptString = @'
+
 If ((Get-Service -Name 'Hyper-V Virtual Machine Management').Status -ne 'Running')
 {
     Get-Service -Name 'Hyper-V Virtual Machine Management' | Start-Service -ErrorAction Stop
 }
+
 Import-Module Hyper-V
+
 Convert-VHD -Path "C:\SetupFiles\CloudBuilder.vhdx" -VHDType Fixed -DestinationPath "C:\SetupFiles\ASDK.vhdx" -DeleteSource -ErrorAction Stop
+
 Resize-VHD -Path "C:\SetupFiles\ASDK.vhdx" -SizeBytes 650gb
 '@
 }
@@ -426,6 +430,9 @@ else
     Write-Host ""
 }
 
+#endregion
+
+#region Prepare VM for VHD Boot
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {
     Write-Host "$($VirtualMachineName) - Preparing Virtual Machine VHDs and Configuring it for VHD Boot." -ForegroundColor Green
