@@ -234,7 +234,7 @@ $DataTable | Export-Csv "$ENV:UserProfile\Documents\$CSVFileName" -NoTypeInforma
 Write-Host ""
 Write-Host ""
 #endregion
-
+Pause
 #region Configure Virtual Machine Disks & Install Hyper-V
 Write-host "I am now going to configure the Virtual Machine Disks & Install Hyper-V." -ForegroundColor Yellow
 Write-host "This takes about 5 minutes. Please wait..." -ForegroundColor Yellow
@@ -290,7 +290,7 @@ else
     Write-Host ""
 }
 #endregion
-
+Pause
 #region Copy Setup Files from Azure Storage
 Write-host "I am now going to download setup files from Azure Storage." -ForegroundColor Yellow
 Write-host "This takes about 5 minutes. Please wait..." -ForegroundColor Yellow
@@ -344,7 +344,7 @@ else
     Write-Host ""
 }
 #endregion
-
+Pause
 #region Restart Virtual Machines
 Write-host "Now I need to restart the Virtual Machines." -ForegroundColor Yellow
 Write-host "This can take up to 5 minutes. Please wait..." -ForegroundColor Yellow
@@ -385,7 +385,7 @@ else
     Write-Host ""
 }
 #endregion
-
+Pause
 #region Prepare Virtual Machine Boot VHD & Configure OOBe Setup
 Write-Host "Now it is time to expand & Convert the VHD." -ForegroundColor Yellow
 Write-Host "Depending on Disk Speed, this can take a long time. Just relax...." -ForegroundColor Yellow
@@ -437,7 +437,7 @@ else
 }
 
 #endregion
-
+Pause
 #region Prepare VM for VHD Boot
 foreach ($VirtualMachineName in $DeployedVirtualMachines)
 {

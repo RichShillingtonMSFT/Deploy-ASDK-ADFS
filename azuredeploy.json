@@ -32,11 +32,7 @@
     },
     "virtualMachineSize": {
       "type": "string",
-      "defaultValue": "Standard_E32-16s_v3",
-      "allowedValues":[
-        "Standard_E32-16s_v3",
-        "Standard_E16s_v3"
-      ],
+      "defaultValue": "Standard_E16s_v3",
       "metadata": {
         "description": "Virtual Machine Size"
       }
