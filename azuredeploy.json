@@ -234,9 +234,7 @@
             "managedDisk": {
               "storageAccountType": "PremiumSSD_LRS"
             },
-            "caching": "ReadWrite",
-            "diskSizeGB":1023,
-            "burstingEnabled": "true"
+            "diskSizeGB":1023
           },
           "copy": [
             {
@@ -245,7 +243,9 @@
               "input": {
                 "lun": "[copyIndex('dataDisks')]",
                 "createOption": "Empty",
-                "diskSizeGB": "[parameters('dataDiskSizeGB')]",
+                "diskSizeGB": "[parameters('dataDiskSizeGB')]"
+              },
+              "properties":{
                 "burstingEnabled": "true"
               }
             }
