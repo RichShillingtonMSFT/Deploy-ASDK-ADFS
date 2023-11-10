@@ -403,9 +403,9 @@ If ((Get-Service -Name 'Hyper-V Virtual Machine Management').Status -ne 'Running
 
 Import-Module Hyper-V
 
-Convert-VHD -Path "C:\SetupFiles\CloudBuilder.vhdx" -VHDType Fixed -DestinationPath "C:\SetupFiles\ASDK.vhdx" -DeleteSource -ErrorAction Stop
-
-Resize-VHD -Path "C:\SetupFiles\ASDK.vhdx" -SizeBytes 650gb
+#Convert-VHD -Path "C:\SetupFiles\CloudBuilder.vhdx" -VHDType Fixed -DestinationPath "C:\SetupFiles\ASDK.vhdx" -DeleteSource -ErrorAction Stop
+Rename-Item -Path "C:\SetupFiles\CloudBuilder.vhdx" -NewName "ASDK.vhdx" -Force
+Resize-VHD -Path "C:\SetupFiles\ASDK.vhdx" -SizeBytes 1500gb
 '@
 }
 
