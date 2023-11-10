@@ -234,7 +234,11 @@
             "managedDisk": {
               "storageAccountType": "PremiumSSD_LRS"
             },
-            "diskSizeGB":1023
+            "caching": "ReadWrite",
+            "diskSizeGB":1023,
+            "properties":{
+                "burstingEnabled": "true"
+            }
           },
           "copy": [
             {
