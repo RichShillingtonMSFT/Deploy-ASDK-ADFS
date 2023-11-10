@@ -232,7 +232,7 @@
             "name": "[format('{0}{1}', variables('VMPrefix'), add(range(0, parameters('virtualMachineCount'))[copyIndex()], 1))]",
             "createOption": "FromImage",
             "managedDisk": {
-              "storageAccountType": "PremiumSSD_LRS"
+              "storageAccountType": "Premium_LRS"
             },
             "caching": "ReadWrite",
             "diskSizeGB":1023,
@@ -250,6 +250,7 @@
                 "diskSizeGB": "[parameters('dataDiskSizeGB')]"
               },
               "properties":{
+                "storageAccountType": "Premium_LRS",
                 "burstingEnabled": "true"
               }
             }
