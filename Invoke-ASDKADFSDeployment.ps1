@@ -691,7 +691,7 @@ else
     Write-Host ""
 }
 #endregion
-pause
+
 #region Run Windows Update on ASDK VHD
 Write-Host "Now I need to run Windows Update to make these VMs all safe and stuff." -ForegroundColor Yellow
 Write-host "I will reboot them when it is done. Please wait..." -ForegroundColor Yellow
@@ -1150,7 +1150,7 @@ else
     Write-Host ""
 }
 #endregion
-pause
+
 #region Restart Virtual Machines
 Write-host "Now I need to restart the Virtual Machines." -ForegroundColor Yellow
 Write-host "This can take up to 5 minutes. Please wait..." -ForegroundColor Yellow
@@ -1192,7 +1192,7 @@ else
     Write-Host ""
 }
 #endregion
-pause
+
 #region Create AD,CA & ADFS Virtual Machines
 Write-Host "Now I must Configure the Hyper-V host and setup the Domain Controller, Certificate Services & ADFS" -ForegroundColor Yellow
 Write-host "This should take about 25 minutes. I am doing lots of work for you. Settle Down..." -ForegroundColor Yellow
@@ -1385,7 +1385,7 @@ else
     Write-Host ""
 }
 #endregion
-Pause
+
 #region Install Active Directory & add ADFS and ADCS to the Domain
 Write-Host "Now I will install Active Directory" -ForegroundColor Yellow
 Write-Host "I am also going to add ADFS and ADCS Servers to the Domain." -ForegroundColor Yellow
