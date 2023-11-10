@@ -232,10 +232,11 @@
             "name": "[format('{0}{1}', variables('VMPrefix'), add(range(0, parameters('virtualMachineCount'))[copyIndex()], 1))]",
             "createOption": "FromImage",
             "managedDisk": {
-              "storageAccountType": "StandardSSD_LRS"
+              "storageAccountType": "PremiumSSD_LRS"
             },
             "caching": "ReadWrite",
-            "diskSizeGB":1023
+            "diskSizeGB":1023,
+            "burstingEnabled": "true"
           },
           "copy": [
             {
@@ -244,7 +245,8 @@
               "input": {
                 "lun": "[copyIndex('dataDisks')]",
                 "createOption": "Empty",
-                "diskSizeGB": "[parameters('dataDiskSizeGB')]"
+                "diskSizeGB": "[parameters('dataDiskSizeGB')]",
+                "burstingEnabled": "true"
               }
             }
           ]
