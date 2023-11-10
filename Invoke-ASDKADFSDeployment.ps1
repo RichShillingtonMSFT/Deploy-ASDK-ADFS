@@ -247,6 +247,10 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
     Write-Host ""
 
 $ScriptString = @"
+`$Partition = Get-Partition -DriveLetter C
+`$Size = (Get-PartitionSupportedSize -DiskNumber `$Partition.DiskNumber -PartitionNumber `$Partition.PartitionNumber)
+Resize-Partition -DiskNumber `$Partition.DiskNumber -PartitionNumber `$Partition.PartitionNumber -Size `$Size.SizeMax
+
 `@'
 Select Disk 0
 Select Partition 2
