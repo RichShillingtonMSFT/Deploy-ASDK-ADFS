@@ -231,6 +231,8 @@ foreach ($DeployedVirtualMachine in $DeployedVirtualMachines)
 
 $CSVFileName = $($LabResourceGroup.ResourceGroupName) + '-DeployedVMs-' + $(Get-Date -f yyyy-MM-dd) + '.csv'
 $DataTable | Export-Csv "$ENV:UserProfile\Documents\$CSVFileName" -NoTypeInformation -Force
+Write-Host ""
+Write-Host ""
 #endregion
 
 #region Configure Virtual Machine Disks & Install Hyper-V
@@ -2507,6 +2509,7 @@ else
 }
 #endregion
 
+<#
 #region Setup ASDK Install Job
 Write-Host "Only 2 more steps after this! hang in there buddy..." -ForegroundColor Yellow
 Write-Host ""
@@ -2708,7 +2711,7 @@ else
     Write-Host ""
 }
 #endregion
-
+#>
 $ScriptEndTime = (Get-Date)
 
 Write-Host "Deployment Jobs are complete." -ForegroundColor Green
