@@ -236,9 +236,7 @@
             },
             "caching": "ReadWrite",
             "diskSizeGB":1023,
-            "properties":{
-                "burstingEnabled": "true"
-            }
+            "burstingEnabled": "true"
           },
           "copy": [
             {
@@ -249,10 +247,8 @@
                 "createOption": "Empty",
                 "diskSizeGB": "[parameters('dataDiskSizeGB')]"
               },
-              "properties":{
-                "storageAccountType": "Premium_LRS",
-                "burstingEnabled": "true"
-              }
+              "storageAccountType": "Premium_LRS",
+              "burstingEnabled": "true"
             }
           ]
         },
