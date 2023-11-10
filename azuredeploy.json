@@ -235,8 +235,7 @@
               "storageAccountType": "Premium_LRS"
             },
             "caching": "ReadWrite",
-            "diskSizeGB":1023,
-            "burstingEnabled": "true"
+            "diskSizeGB":1023
           },
           "copy": [
             {
@@ -247,8 +246,7 @@
                 "createOption": "Empty",
                 "diskSizeGB": "[parameters('dataDiskSizeGB')]"
               },
-              "storageAccountType": "Premium_LRS",
-              "burstingEnabled": "true"
+              "storageAccountType": "Premium_LRS"
             }
           ]
         },
