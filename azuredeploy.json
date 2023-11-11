@@ -39,11 +39,10 @@
     },
     "operatingSystem": {
       "type": "string",
-      "defaultValue": "Server2022",
+      "defaultValue": "Server2019",
       "allowedValues": [
         "Server2016",
-        "Server2019",
-        "Server2022"
+        "Server2019"
       ],
       "metadata": {
         "description": "Operating System of the Server"
