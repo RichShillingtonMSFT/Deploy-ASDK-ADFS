@@ -2513,7 +2513,6 @@ else
 }
 #endregion
 
-<#
 #region Setup ASDK Install Job
 Write-Host "Only 2 more steps after this! hang in there buddy..." -ForegroundColor Yellow
 Write-Host ""
@@ -2715,7 +2714,7 @@ else
     Write-Host ""
 }
 #endregion
-#>
+
 $ScriptEndTime = (Get-Date)
 
 Write-Host "Deployment Jobs are complete." -ForegroundColor Green
