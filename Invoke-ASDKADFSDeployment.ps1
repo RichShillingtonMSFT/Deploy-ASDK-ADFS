@@ -3,14 +3,14 @@
     Script to deploy ASDKs in Azure with ADFS.
 
 .DESCRIPTION
-    Use this script to deploy ASDKs in Azure that use ADFS for Identity
+    Use this script to deploy ASDKs in Azure that use ADFS for Identity.
 
 .EXAMPLE
     .\Invoke-ASDKADFSDeployment.ps1 -LabResourceGroupName 'ASDK-ADFS-RG' `
         -DNSForwarder '8.8.8.8' -TimeServer '168.61.215.74' `
         -VirtualMachineAdminUserName 'VMAdmin' `
-        -ASDKVersion '2108' -VirtualMachineNamePrefix 'HUB' `
-        -VirtualMachineCount '1' -DNSPrefixForPublicIP 'asdk-'
+        -ASDKVersion '2301' -VirtualMachineNamePrefix 'asdk' `
+        -VirtualMachineCount '1' -DNSPrefixForPublicIP 'asdk'
 #>
 [CmdletBinding()]
 Param
