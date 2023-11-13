@@ -33,3 +33,12 @@ You can specify your own Resource Group Name, Virtual Machine Admin UserName, DN
 
 The script will prompt you to select the Azure Environment for deployment, the subscription to use for deployment, the Azure Region/Location & the password to use for the deployed environment.
 
+The complete deployment will take about 10-12 hours. When the deployment is complete, you will see the following in the PowerShell window on the ASDK.
+
+![](images/complete.jpg)
+
+## Post deployment tasks
+
+When the deployment is complete, you can run .\FinalizeServers.ps1 located on the root of C:\ to restore the contoso.local virtual machines.
+
+Or you could use Restore-ASDKDomainVMs.ps1 to perform the VM restore on all ASDKs in the Resource Group.
