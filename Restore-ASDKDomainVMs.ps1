@@ -156,18 +156,56 @@ Foreach ($Server in $Servers)
         }
     }
 }
-
-New-ADUser -AccountPassword $Password -UserPrincipalName 'breakglass@azurestack.local' -PasswordNeverExpires:$true -Name breakglass -Enabled:$true
-$User = Get-ADUser breakglass
-$Groups = Get-ADGroup -Filter * | Where-Object {$_.Name -like "*admin*"}
-foreach ($Group in $Groups)
-{
-    Add-ADGroupMember -Identity $Group.Name -Members $User.Name
-}
 '@
 
     $ScriptString = $ScriptString.Replace('[AdminPassword]',"$AdminPassword")
 
+    Invoke-AzVMRunCommand -VMName $($VirtualMachine.Name) `
+        -ResourceGroupName $LabResourceGroup.ResourceGroupName `
+        -CommandId 'RunPowerShellScript' `
+        -ScriptString $ScriptString -AsJob | Out-Null
+}
+
+$Result = Get-Job | Wait-Job | Receive-Job
+$EndTime = (Get-Date)
+
+if (($Result.Value.DisplayStatus | Select-Object -Unique) -ne 'Provisioning succeeded') 
+{
+    throw 'Failed to Restore Domain VMs!'
+    break
+}
+else
+{
+    Write-Host "PowerShell Job $($Result.Value.DisplayStatus)" -ForegroundColor Green
+    Write-Host "$($Result.Value.Message)" -ForegroundColor Green
+    Write-Host "StartTime $($StartTime)" -ForegroundColor White
+    Write-Host "EndTime $($EndTime)" -ForegroundColor White
+    Write-Host $('Duration: {0:mm} min {0:ss} sec' -f ($EndTime - $StartTime)) -ForegroundColor White
+    Write-Host ""
+}
+
+$ScriptString = @'
+$Password = '[AdminPassword]' | ConvertTo-SecureString -asPlainText -Force
+$Username = 'AzureStack\AzureStackAdmin'
+$DomainCredential = New-Object System.Management.Automation.PSCredential($Username,$Password)
+
+New-ADUser -AccountPassword $Password -UserPrincipalName 'breakglass@azurestack.local' -PasswordNeverExpires:$true -Name breakglass -Enabled:$true -Credential $DomainCredential
+$User = Get-ADUser breakglass -Credential $DomainCredential
+$Groups = Get-ADGroup -Filter * -Credential $DomainCredential | Where-Object {$_.Name -like "*admin*"}
+foreach ($Group in $Groups)
+{
+    Add-ADGroupMember -Identity $($Group.Name) -Members $($User.Name) -Credential $DomainCredential
+}
+'@
+
+$ScriptString = $ScriptString.Replace('[AdminPassword]',"$AdminPassword")
+
+$StartTime = (Get-Date)
+foreach ($VirtualMachine in $VirtualMachines)
+{
+    Write-host "$($VirtualMachine.Name) - Creating BreakGlass Account on ASDK." -ForegroundColor Green
+    Write-Host ""
+    
     Invoke-AzVMRunCommand -VMName $($VirtualMachine.Name) `
         -ResourceGroupName $LabResourceGroup.ResourceGroupName `
         -CommandId 'RunPowerShellScript' `
