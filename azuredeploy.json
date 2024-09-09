@@ -148,6 +148,29 @@
   },
   "resources": [
     {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "[variables('apiVersions').networkSecurityGroupsAPIVersion]",
+      "name": "[variables('NSGName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "allow-3389",
+            "properties": {
+              "priority": 1000,
+              "access": "Allow",
+              "direction": "Inbound",
+              "destinationPortRange": "3389",
+              "protocol": "Tcp",
+              "sourceAddressPrefix": "[parameters('sourceAddressForRDP')]",
+              "sourcePortRange": "*",
+              "destinationAddressPrefix": "*"
+            }
+          }
+        ]
+      }
+    },
+    {
       "type": "Microsoft.Network/virtualNetworks",
       "apiVersion": "[variables('apiVersions').virtualNetworksAPIVersion]",
       "name": "[variables('VNETName')]",
@@ -166,12 +189,16 @@
             "name": "[parameters('subnetName')]",
             "properties": {
               "addressPrefix": "[parameters('subnetPrefix')]",
-              "networkSecurityGroup": {}
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('NSGName'))]"
+              }
             }
           }
         ]
       },
-      "dependsOn": []
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkSecurityGroups', variables('NSGName'))]"
+      ]
     },
     {
       "type": "Microsoft.Storage/storageAccounts",
