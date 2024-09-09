@@ -162,7 +162,7 @@
               "direction": "Inbound",
               "destinationPortRange": "3389",
               "protocol": "Tcp",
-              "sourceAddressPrefix": "[parameters('sourceAddressForRDP')]",
+              "sourceAddressPrefix": "*",
               "sourcePortRange": "*",
               "destinationAddressPrefix": "*"
             }
