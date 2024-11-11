@@ -28,12 +28,12 @@ Param
     [String]$DataDiskSizeGB = '2048',
 
     # Provide the DNS Forwarder to be used on the ASDK
-	[Parameter(Mandatory=$true,HelpMessage="Provide the DNS Forwarder to be used on the ASDK")]
-    [String]$DNSForwarder,
+	[Parameter(Mandatory=$false,HelpMessage="Provide the DNS Forwarder to be used on the ASDK")]
+    [String]$DNSForwarder = '8.8.8.8',
 
     # Provide a Time Server IP
-	[Parameter(Mandatory=$true,HelpMessage="Provide a Time Server IP")]
-    [String]$TimeServer,
+	[Parameter(Mandatory=$false,HelpMessage="Provide a Time Server IP")]
+    [String]$TimeServer = '168.61.215.74',
 
     # Provide a Virtual Machine Admin Username
 	[Parameter(Mandatory=$true,HelpMessage="Provide a Virtual Machine Admin Username")]
@@ -44,22 +44,22 @@ Param
     [SecureString]$VirtualMachineAdminPassword,
 
     # The version of ASDK to be deployed
-	[Parameter(Mandatory=$true,HelpMessage="The version of ASDK to be deployed")]
+	[Parameter(Mandatory=$false,HelpMessage="The version of ASDK to be deployed")]
     [ValidateSet('2301','2206','2108')]
-    [String]$ASDKVersion,
+    [String]$ASDKVersion = '2301',
 
     # The Virtual Machine Name Prefix
-    [Parameter(Mandatory=$true,HelpMessage="The Virtual Machine Name Prefix")]
-    [String]$VirtualMachineNamePrefix,
+    [Parameter(Mandatory=$false,HelpMessage="The Virtual Machine Name Prefix")]
+    [String]$VirtualMachineNamePrefix = 'azs',
 
-    [Parameter(Mandatory=$true,HelpMessage="Provide the count of ASDKs to Deploy")]
-    [Int]$VirtualMachineCount,
+    [Parameter(Mandatory=$false,HelpMessage="Provide the count of ASDKs to Deploy")]
+    [Int]$VirtualMachineCount = '1',
 
     [Parameter(Mandatory=$false,HelpMessage="Select the Virtual Machine SKU Size.")]
     [String]$VirtualMachineSize = 'Standard_E16s_v3',
 
-    [Parameter(Mandatory=$true,HelpMessage="Provide a DNS Prefix for the Public IP")]
-    [String]$DNSPrefixForPublicIP,
+    [Parameter(Mandatory=$false,HelpMessage="Provide a DNS Prefix for the Public IP")]
+    [String]$DNSPrefixForPublicIP = 'azs1',
 
     [Parameter(Mandatory=$false,HelpMessage="Provide a Name for the Virtual Network")]
     [String]$VirtualNetworkName = 'AzSHub-VNet',
@@ -127,7 +127,7 @@ $Environment = $Environments | Out-GridView -Title "Please Select the Azure Envi
 
 try
 {
-    Connect-AzAccount -Environment $($Environment.Name) -ErrorAction 'Stop'
+    Connect-AzAccount -Environment $($Environment.Name) -TenantId 'c7d77d49-6184-4428-97bb-1d5542228108' -UseDeviceAuthentication  -ErrorAction Stop
 }
 catch
 {
@@ -158,7 +158,7 @@ Write-Host ""
 #endregion
 
 #region Create Resource Group
-$LabResourceGroup = Get-AzResourceGroup -Name $LabResourceGroupName -Location $Location.Location -ErrorAction SilentlyContinue
+$LabResourceGroup = Get-AzResourceGroup -Name $LabResourceGroupName -ErrorAction SilentlyContinue
 If (!($LabResourceGroup))
 {
     $LabResourceGroup = New-AzResourceGroup -Name $LabResourceGroupName -Location $Location.Location
@@ -311,7 +311,7 @@ Copy-Item -Path $AzCopyFile.FullName -Destination 'C:\Windows\System32' -Force;
 Remove-Item "$($InstallFilesDirectory.FullName)\azcopy" -Force -Recurse;
 Remove-Item "$($InstallFilesDirectory.FullName)\azcopy.zip" -Force;
 azcopy copy '[ASDKLinkUri]' "$($InstallFilesDirectory.FullName)\CloudBuilder.vhdx";
-azcopy copy 'https://asdkdeploymentsa.blob.core.usgovcloudapi.net/vhds/2019Server.vhd' "$($InstallFilesDirectory.FullName)\2019Server.vhd";
+azcopy copy 'https://asdkdeploymentsa.blob.core.usgovcloudapi.net/vhds/2019server.vhd' "$($InstallFilesDirectory.FullName)\2019Server.vhd";
 azcopy copy 'https://asdkdeploymentsa.blob.core.usgovcloudapi.net/software' $($InstallFilesDirectory.FullName) --recursive=true;
 azcopy copy 'https://asdkdeploymentsa.blob.core.usgovcloudapi.net/dsc' $($InstallFilesDirectory.FullName) --recursive=true;
 '@
@@ -407,9 +407,7 @@ If ((Get-Service -Name 'Hyper-V Virtual Machine Management').Status -ne 'Running
 
 Import-Module Hyper-V
 
-#Convert-VHD -Path "C:\SetupFiles\CloudBuilder.vhdx" -VHDType Fixed -DestinationPath "C:\SetupFiles\ASDK.vhdx" -DeleteSource -ErrorAction Stop
-Rename-Item -Path "C:\SetupFiles\CloudBuilder.vhdx" -NewName "ASDK.vhdx" -Force
-Resize-VHD -Path "C:\SetupFiles\ASDK.vhdx" -SizeBytes 1500gb
+Resize-VHD -Path "C:\SetupFiles\CloudBuilder.vhdx" -SizeBytes 1500gb
 '@
 }
 
@@ -445,12 +443,12 @@ foreach ($VirtualMachineName in $DeployedVirtualMachines)
     Write-Host ""
 
 $ScriptString = @"
-`$Prepare_Vhdx_Path = "C:\SetupFiles\ASDK.vhdx"
+`$Prepare_Vhdx_Path = "C:\SetupFiles\CloudBuilder.vhdx"
 
 #Remove boot from previous deployment
 `$bootOptions = bcdedit /enum  | Select-String 'path' -Context 2,1
 `$bootOptions | ForEach-Object {
-if (((`$_.Context.PreContext[1] -replace '^device +') -like '*ASDK.vhdx*') -and ((`$_.Context.PostContext[0] -replace '^description +') -eq 'Azure Stack'))
+if (((`$_.Context.PreContext[1] -replace '^device +') -like '*CloudBuilder.vhdx*') -and ((`$_.Context.PostContext[0] -replace '^description +') -eq 'Azure Stack'))
     {
         `$BootID = '"' + (`$_.Context.PreContext[0] -replace '^identifier +') + '"'
         bcdedit /delete `$BootID
@@ -491,7 +489,7 @@ bcdboot `$Prepare_Vhdx_DriveLetter':\Windows'
 #Add Boot entry
 `$bootOptions = bcdedit /enum  | Select-String 'path' -Context 2,1
 `$bootOptions | ForEach-Object {
-    if ((((`$_.Context.PreContext[1] -replace '^device +') -eq ('partition='+`$Prepare_Vhdx_DriveLetter+':') -or ((`$_.Context.PreContext[1] -replace '^device +') -like '*ASDK.vhdx*')) -and ((`$_.Context.PostContext[0] -replace '^description +') -ne 'Azure Stack'))) {
+    if ((((`$_.Context.PreContext[1] -replace '^device +') -eq ('partition='+`$Prepare_Vhdx_DriveLetter+':') -or ((`$_.Context.PreContext[1] -replace '^device +') -like '*CloudBuilder.vhdx*')) -and ((`$_.Context.PostContext[0] -replace '^description +') -ne 'Azure Stack'))) {
         `$BootID = '"' + (`$_.Context.PreContext[0] -replace '^identifier +') + '"'
         bcdedit /set `$BootID description "Azure Stack"
     }
@@ -1238,7 +1236,7 @@ Copy-Item -Path 'E:\Windows\System32\azcopy.exe' -Destination 'C:\Windows\System
 
 Foreach ($Server in $Servers)
 {
-    azcopy copy 'https://asdkdeploymentsa.blob.core.usgovcloudapi.net/vhds/2019Server.vhd' "$($VMDisksDirectory.FullName)\2019Server.vhd"
+    azcopy copy 'https://asdkdeploymentsa.blob.core.usgovcloudapi.net/vhds/2019server.vhd' "$($VMDisksDirectory.FullName)\2019Server.vhd"
     Rename-Item -Path "$($VMDisksDirectory.FullName)\2019Server.vhd" -NewName ($Server.ServerName + '.vhd') -Verbose
 
     # Disable Autoplay
